@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#1c1c1e" id="themeColorMeta"/>
 <title>Sliders</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
@@ -13,475 +12,517 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-  html,body{min-height:100vh;min-height:100dvh;transition:background 0.25s;overscroll-behavior:none;}
-  ::-webkit-scrollbar{width:3px;}
-  ::-webkit-scrollbar-thumb{border-radius:2px;}
-  textarea,input{outline:none;-webkit-appearance:none;appearance:none;border-radius:0;}
-  button{-webkit-appearance:none;appearance:none;touch-action:manipulation;}
-  input[type="text"],textarea{font-size:16px!important;} /* prevents iOS zoom on focus */
-  @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-
-  /* Tablet layout */
-  @media(min-width:600px){
-    .main-wrap{max-width:600px!important;}
-    .donut-section{flex-direction:row!important;}
-    .slider-track{height:36px!important;}
-  }
-  @media(min-width:900px){
-    .main-wrap{max-width:720px!important;}
-  }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{min-height:100dvh;transition:background 0.25s;overscroll-behavior:none;}
+textarea,input{outline:none;-webkit-appearance:none;appearance:none;}
+button{-webkit-appearance:none;appearance:none;touch-action:manipulation;cursor:pointer;}
+input[type="text"],input[type="color"],textarea{font-size:16px!important;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{border-radius:2px;background:#444;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn 0.15s ease;backdrop-filter:blur(4px);}
+.modal-sheet{width:100%;max-width:520px;animation:fadeUp 0.22s ease;}
+@media(min-width:600px){.main-wrap{max-width:600px!important;}.modal-overlay{align-items:center;}.modal-sheet{border-radius:16px!important;max-width:460px;}}
+@media(min-width:900px){.main-wrap{max-width:720px!important;}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useEffect, useCallback } = React;
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
+const TOTAL=24,KEY="sliders_v3";
+const PALETTE=["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
+const STEPS=[{l:"1m",m:1},{l:"2m",m:2},{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30},{l:"1h",m:60}];
+const DARK={bg:"#1c1c1e",bgCard:"#2a2a2e",bgInput:"#323236",bgSlider:"#3a3a3e",border:"#424246",borderMid:"#505055",text:"#f5f5f5",textSub:"#d8d8d8",textMuted:"#aaaaaa",textDim:"#888",textFaint:"#666",donutFree:"#3a3a3e",tc:"#1c1c1e"};
+const LIGHT={bg:"#f4f3ef",bgCard:"#eceae4",bgInput:"#e4e2db",bgSlider:"#d8d6cf",border:"#cac8c1",borderMid:"#bbb9b2",text:"#1a1a1a",textSub:"#2e2e2e",textMuted:"#555",textDim:"#777",textFaint:"#999",donutFree:"#d8d6cf",tc:"#f4f3ef"};
 
-const TOTAL_HOURS = 24;
-const STORAGE_KEY = "sliders_v2";
-
-const COLORS = [
-  "#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94",
-  "#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2",
-];
-
-const STEPS = [
-  {label:"1m",minutes:1},{label:"2m",minutes:2},{label:"5m",minutes:5},
-  {label:"10m",minutes:10},{label:"15m",minutes:15},{label:"30m",minutes:30},{label:"1h",minutes:60},
-];
-
-const DARK = {
-  bg:"#1c1c1e", bgCard:"#2a2a2e", bgInput:"#323236", bgSlider:"#3a3a3e",
-  border:"#424246", borderMid:"#505055",
-  text:"#f5f5f5", textSub:"#d8d8d8", textMuted:"#aaaaaa", textDim:"#888888", textFaint:"#666666",
-  donutFree:"#3a3a3e", donutFreeB:"#505055", themeColor:"#1c1c1e",
-};
-const LIGHT = {
-  bg:"#f4f3ef", bgCard:"#eceae4", bgInput:"#e4e2db", bgSlider:"#d8d6cf",
-  border:"#cac8c1", borderMid:"#bbb9b2",
-  text:"#1a1a1a", textSub:"#2e2e2e", textMuted:"#555", textDim:"#777", textFaint:"#999",
-  donutFree:"#d8d6cf", donutFreeB:"#bbb9b2", themeColor:"#f4f3ef",
-};
-
-function hoursToDisplay(h){
-  const m=Math.round(h*60),hrs=Math.floor(m/60),mins=m%60;
-  if(hrs===0)return `${mins}m`;
-  if(mins===0)return `${hrs}h`;
-  return `${hrs}h ${mins}m`;
-}
-function snapToStep(hours,step){return Math.round(hours*60/step)*step/60;}
+function hm(h){const m=Math.round(h*60),H=Math.floor(m/60),M=m%60;if(H===0)return`${M}m`;if(M===0)return`${H}h`;return`${H}h ${M}m`;}
+function snap(h,s){return Math.round(h*60/s)*s/60;}
+function loadState(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}catch{return null;}}
+function save(s){try{localStorage.setItem(KEY,JSON.stringify(s));}catch{}}
 function parseMD(text){
   const tasks=[];
   for(const line of text.split("\n")){
-    const m=line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})?/);
-    if(m) tasks.push({id:Date.now()+Math.random(),name:m[1].trim(),hours:parseFloat(m[2]),color:m[3]||COLORS[tasks.length%COLORS.length]});
+    const m=line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6})?/);
+    if(m) tasks.push({id:Date.now()+Math.random(),name:m[1].trim(),hours:parseFloat(m[2]),color:m[3]||PALETTE[tasks.length%PALETTE.length],locked:false,actual:0});
   }
   return tasks;
 }
 function serializeMD(tasks){
-  const total=tasks.reduce((s,t)=>s+t.hours,0),unalloc=Math.max(0,TOTAL_HOURS-total);
-  let out=`# Sliders — Daily Time Allocation\n\n> Total: ${hoursToDisplay(total)} / 24h | Unallocated: ${hoursToDisplay(unalloc)}\n\n---\n\n`;
-  for(const t of tasks) out+=`## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Time: ${hoursToDisplay(t.hours)}\n- Percentage: ${((t.hours/TOTAL_HOURS)*100).toFixed(1)}%\n\n`;
+  const total=tasks.reduce((s,t)=>s+t.hours,0),unalloc=Math.max(0,TOTAL-total);
+  let out=`# Sliders — Daily Time Allocation\n\n> Total: ${hm(total)} / 24h | Unallocated: ${hm(unalloc)}\n\n---\n\n`;
+  for(const t of tasks) out+=`## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${hm(t.hours)} (${((t.hours/TOTAL)*100).toFixed(1)}%)\n- Actual: ${hm(t.actual||0)}\n\n`;
   return out+`---\n_Generated by Sliders App_\n`;
 }
-function loadState(){try{const r=localStorage.getItem(STORAGE_KEY);return r?JSON.parse(r):null;}catch{return null;}}
-function saveState(s){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(s));}catch{}}
 
-// ── ThemeToggle ───────────────────────────────────────────────────────────────
-function ThemeToggle({dark,onToggle,T}){
+// ── tiny helpers ──────────────────────────────────────────────────────────────
+const T24=Array.from({length:25},(_,i)=>i);
+
+function useWindowWidth(){
+  const [w,setW]=useState(window.innerWidth);
+  useEffect(()=>{const h=()=>setW(window.innerWidth);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  return w;
+}
+
+// ── SLIDER ────────────────────────────────────────────────────────────────────
+function Slider({value,max=TOTAL,color,step,locked,onChange}){
+  const ref=useRef();const drag=useRef(false);
+  const get=useCallback((cx)=>{
+    const r=ref.current.getBoundingClientRect();
+    return snap(Math.max(0,Math.min(1,(cx-r.left)/r.width))*max,step);
+  },[step,max]);
+  const pd=(e)=>{if(locked)return;e.preventDefault();drag.current=true;ref.current.setPointerCapture(e.pointerId);onChange(get(e.clientX));};
+  const pm=(e)=>{if(drag.current)onChange(get(e.clientX));};
+  const pu=(e)=>{if(drag.current){drag.current=false;onChange(get(e.clientX));}};
+  const pct=(value/max)*100;
   return(
-    <button onClick={onToggle} style={{
-      display:"flex",alignItems:"center",gap:8,
-      background:"none",border:`1px solid ${T.border}`,
-      borderRadius:24,padding:"8px 14px",cursor:"pointer",
-      transition:"all 0.2s",minHeight:44,
-    }}>
-      <span style={{fontSize:15,lineHeight:1}}>{dark?"☀️":"🌙"}</span>
-      <div style={{width:36,height:20,borderRadius:10,background:dark?"#2a2a2a":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
-        <div style={{position:"absolute",top:3,left:dark?16:3,width:14,height:14,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
+    <div ref={ref} onPointerDown={pd} onPointerMove={pm} onPointerUp={pu}
+      style={{position:"relative",height:40,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:"none",overflow:"hidden"}}>
+      <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
+      <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${color}66,${color})`,borderRadius:8,transition:drag.current?"none":"width 0.05s"}}/>
+      {[6,12,18].map(h=><div key={h} style={{position:"absolute",left:`${(h/max)*100}%`,top:"15%",bottom:"15%",width:1,background:"var(--border-mid)",opacity:0.5}}/>)}
+      <div style={{position:"absolute",left:`${pct}%`,top:"50%",transform:"translate(-50%,-50%)",width:20,height:32,background:locked?"#666":color,borderRadius:6,boxShadow:locked?"none":`0 2px 12px ${color}99`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",transition:"left 0.05s"}}>
+        {!locked&&<div style={{width:2,height:12,background:"rgba(0,0,0,0.3)",borderRadius:1}}/>}
+        {locked&&<span style={{fontSize:10,color:"#fff"}}>🔒</span>}
       </div>
-    </button>
+    </div>
   );
 }
 
-// ── DonutChart ────────────────────────────────────────────────────────────────
-function DonutChart({tasks,T}){
-  const size=150,r=56,cx=75,cy=75,innerR=33;
+// ── TASK CARD ─────────────────────────────────────────────────────────────────
+function TaskCard({task,stepMinutes,T,onChange,onDelete,onEdit,onLock,showActual}){
+  const actualPct=Math.min(100,((task.actual||0)/TOTAL)*100);
+  const plannedPct=(task.hours/TOTAL)*100;
+  const diff=(task.actual||0)-task.hours;
+  return(
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 10px",marginBottom:10,transition:"background 0.2s,border-color 0.2s",opacity:task.locked?0.85:1}}>
+      {/* Header row */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+        {/* Color dot — tap to edit */}
+        <button onClick={onEdit} style={{width:20,height:20,borderRadius:"50%",background:task.color,border:"none",flexShrink:0,boxShadow:`0 0 8px ${task.color}88`,padding:0}}/>
+        {/* Name */}
+        <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
+        {/* Hours badge */}
+        <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:task.color,fontWeight:"bold",flexShrink:0}}>{hm(task.hours)}</span>
+        {/* Action buttons */}
+        <div style={{display:"flex",gap:2,flexShrink:0}}>
+          <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}>{task.locked?"🔓":"🔒"}</Btn44>
+          {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete">✕</Btn44>}
+        </div>
+      </div>
+
+      {/* Planned slider */}
+      <Slider value={task.hours} step={stepMinutes} color={task.color} locked={task.locked} onChange={h=>onChange({...task,hours:h})}/>
+
+      {/* Actual time bar (secondary, smaller) */}
+      {showActual&&(
+        <div style={{marginTop:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+            <span style={{fontSize:9,color:T.textDim,letterSpacing:1}}>ACTUAL</span>
+            <span style={{fontSize:10,color:diff>0?"#ff7777":diff<0?"#4ECDC4":T.textDim,fontFamily:"'Space Mono',monospace"}}>
+              {hm(task.actual||0)}{diff!==0?` (${diff>0?"+":""}${hm(Math.abs(diff))})`:""}</span>
+          </div>
+          <Slider value={task.actual||0} step={stepMinutes} color={diff>0?"#ff7777":"#4ECDC4"} locked={false} onChange={h=>onChange({...task,actual:h})}/>
+        </div>
+      )}
+
+      {/* Hour ticks */}
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
+        {[0,6,12,18,24].map(h=><span key={h}>{h}h</span>)}
+      </div>
+
+
+    </div>
+  );
+}
+
+function Btn44({onClick,danger,children,title}){
+  return(
+    <button onClick={onClick} title={title} style={{background:"none",border:"none",width:36,height:36,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"inherit",transition:"background 0.15s"}}
+      onTouchStart={e=>{e.currentTarget.style.background=danger?"#ff444430":"rgba(255,255,255,0.08)";}}
+      onTouchEnd={e=>{e.currentTarget.style.background="none";}}
+      onMouseEnter={e=>{e.currentTarget.style.background=danger?"#ff444430":"rgba(255,255,255,0.08)";}}
+      onMouseLeave={e=>{e.currentTarget.style.background="none";}}
+    >{children}</button>
+  );
+}
+
+// ── EDIT MODAL ────────────────────────────────────────────────────────────────
+function EditModal({task,T,onSave,onClose}){
+  const [name,setName]=useState(task.name);
+  const [color,setColor]=useState(task.color);
+  return(
+    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:2,color:T.text}}>EDIT TASK</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        {/* Name input */}
+        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:6}}>TASK NAME</label>
+        <input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&onSave({...task,name:name.trim()||task.name,color})}
+          style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:T.text,fontFamily:"'Space Mono',monospace",fontSize:15,marginBottom:20}}/>
+        {/* Color palette */}
+        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:10}}>COLOR</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
+          {PALETTE.map(c=>(
+            <button key={c} onClick={()=>setColor(c)} style={{width:36,height:36,borderRadius:"50%",background:c,border:color===c?`3px solid ${T.text}`:`2px solid transparent`,padding:0,boxShadow:color===c?`0 0 0 2px ${T.bg}, 0 0 0 4px ${c}`:"none",transition:"all 0.15s"}}/>
+          ))}
+        </div>
+        {/* Save */}
+        <button onClick={()=>onSave({...task,name:name.trim()||task.name,color})}
+          style={{width:"100%",background:"#FF6B2B",border:"none",borderRadius:12,padding:"15px",color:"#000",fontFamily:"'Space Mono',monospace",fontSize:14,fontWeight:"bold",letterSpacing:1,minHeight:52}}>
+          SAVE CHANGES
+        </button>
+        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── DONUT ─────────────────────────────────────────────────────────────────────
+function Donut({tasks,T}){
+  const size=150,r=56,cx=75,cy=75,inner=33;
   const total=tasks.reduce((s,t)=>s+t.hours,0);
-  const unalloc=Math.max(0,TOTAL_HOURS-total);
-  const all=[...tasks,...(unalloc>0.001?[{name:"Free",hours:unalloc,color:T.donutFree,id:"free"}]:[])];
-  let angle=-Math.PI/2;
-  const slices=all.map(t=>{
-    const sweep=(t.hours/TOTAL_HOURS)*2*Math.PI;
-    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
-    angle+=sweep;
-    const x2=cx+r*Math.cos(angle),y2=cy+r*Math.sin(angle);
-    return{...t,x1,y1,x2,y2,large:sweep>Math.PI?1:0,sweep};
-  });
+  const unalloc=Math.max(0,TOTAL-total);
+  const all=[...tasks,...(unalloc>0.001?[{id:"free",hours:unalloc,color:T.donutFree}]:[])];
+  let a=-Math.PI/2;
   return(
     <svg width={size} height={size} style={{display:"block",flexShrink:0}}>
-      {slices.map((s,i)=>{
-        if(s.sweep<0.002)return null;
-        const d=`M ${cx} ${cy} L ${s.x1} ${s.y1} A ${r} ${r} 0 ${s.large} 1 ${s.x2} ${s.y2} Z`;
-        return <path key={s.id||i} d={d} fill={s.color} stroke={T.bg} strokeWidth={2}/>;
+      {all.map((t,i)=>{
+        const sw=(t.hours/TOTAL)*2*Math.PI;
+        if(sw<0.002)return null;
+        const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a);a+=sw;
+        const x2=cx+r*Math.cos(a),y2=cy+r*Math.sin(a);
+        const d=`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
+        return <path key={t.id||i} d={d} fill={t.color} stroke={T.bg} strokeWidth={2}/>;
       })}
-      <circle cx={cx} cy={cy} r={innerR} fill={T.bg}/>
-      <text x={cx} y={cy-5} textAnchor="middle" fill={T.text} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hoursToDisplay(total)}</text>
+      <circle cx={cx} cy={cy} r={inner} fill={T.bg}/>
+      <text x={cx} y={cy-5} textAnchor="middle" fill={T.text} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(total)}</text>
       <text x={cx} y={cy+11} textAnchor="middle" fill={T.textMuted} fontSize={9} fontFamily="'Space Mono',monospace">of 24h</text>
     </svg>
   );
 }
 
-// ── SliderRow ─────────────────────────────────────────────────────────────────
-function SliderRow({task,onChange,onDelete,stepMinutes,T}){
-  const barRef=useRef(null);
-  const dragging=useRef(false);
-
-  const getHours=useCallback((clientX)=>{
-    const rect=barRef.current.getBoundingClientRect();
-    const ratio=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
-    return snapToStep(ratio*TOTAL_HOURS,stepMinutes);
-  },[stepMinutes]);
-
-  // Pointer events (works for both touch and mouse on Android)
-  const onPointerDown=(e)=>{
-    e.preventDefault();
-    dragging.current=true;
-    barRef.current.setPointerCapture(e.pointerId);
-    onChange(getHours(e.clientX));
-  };
-  const onPointerMove=(e)=>{if(dragging.current)onChange(getHours(e.clientX));};
-  const onPointerUp=(e)=>{if(dragging.current){dragging.current=false;onChange(getHours(e.clientX));}};
-
-  const pct=(task.hours/TOTAL_HOURS)*100;
-
+// ── TIMELINE ──────────────────────────────────────────────────────────────────
+function Timeline({tasks,T,showActual}){
+  const barH=28,gap=6;
+  const rows=tasks.filter(t=>t.hours>0.02);
+  // Stack tasks sequentially (sleep → work → ...) on the 24h bar
+  let cursor=0;
+  const segments=[];
+  for(const t of rows){
+    segments.push({...t,start:cursor,end:cursor+t.hours});
+    cursor+=t.hours;
+  }
   return(
-    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px",marginBottom:10,transition:"background 0.2s,border-color 0.2s"}}>
-      {/* Top row */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
-          <div style={{width:11,height:11,borderRadius:"50%",background:task.color,flexShrink:0,boxShadow:`0 0 8px ${task.color}99`}}/>
-          <span style={{fontFamily:"'Space Mono',monospace",fontSize:14,color:T.textSub,letterSpacing:0.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.name}</span>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:14,flexShrink:0}}>
-          <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:task.color,minWidth:68,textAlign:"right",fontWeight:"bold"}}>{hoursToDisplay(task.hours)}</span>
-          {/* Large tap target for delete */}
-          <button onClick={onDelete} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:18,lineHeight:1,padding:0,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:22,transition:"background 0.15s,color 0.15s"}}
-            onTouchStart={e=>{e.currentTarget.style.background=T.bgInput;e.currentTarget.style.color="#ff4444";}}
-            onTouchEnd={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color=T.textDim;}}
-            onMouseEnter={e=>{e.currentTarget.style.background=T.bgInput;e.currentTarget.style.color="#ff4444";}}
-            onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color=T.textDim;}}>✕</button>
-        </div>
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 10px",marginBottom:16,transition:"background 0.2s"}}>
+      {/* 24h bar */}
+      <div style={{position:"relative",height:36,borderRadius:6,overflow:"hidden",background:T.bgSlider,marginBottom:6}}>
+        {segments.map(s=>{
+          const left=(s.start/TOTAL)*100,width=(s.hours/TOTAL)*100;
+          return(
+            <div key={s.id} title={`${s.name}: ${hm(s.hours)}`} style={{position:"absolute",left:`${left}%`,width:`${width}%`,top:0,bottom:0,background:s.color,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",minWidth:2}}>
+              {width>7&&<span style={{fontSize:9,color:"rgba(0,0,0,0.65)",fontFamily:"'Space Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",padding:"0 4px",fontWeight:"bold"}}>{s.name}</span>}
+            </div>
+          );
+        })}
       </div>
-
-      {/* Slider track — tall for easy touch */}
-      <div ref={barRef}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        className="slider-track"
-        style={{position:"relative",height:40,background:T.bgSlider,borderRadius:8,cursor:"pointer",userSelect:"none",border:`1px solid ${T.borderMid}`,touchAction:"none",transition:"background 0.2s"}}>
-        {/* Fill */}
-        <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${task.color}77,${task.color})`,borderRadius:8}}/>
-        {/* Hour ticks */}
-        {[6,12,18].map(h=><div key={h} style={{position:"absolute",left:`${(h/24)*100}%`,top:"20%",bottom:"20%",width:1,background:T.borderMid,opacity:0.6}}/>)}
-        {/* Thumb */}
-        <div style={{position:"absolute",left:`${pct}%`,top:"50%",transform:"translate(-50%,-50%)",width:22,height:34,background:task.color,borderRadius:6,boxShadow:`0 2px 12px ${task.color}bb`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{width:2,height:14,background:"rgba(0,0,0,0.3)",borderRadius:1}}/>
-        </div>
-      </div>
-
-      {/* Hour labels */}
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
+      {/* Hour markers */}
+      <div style={{display:"flex",justifyContent:"space-between",fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
         {[0,6,12,18,24].map(h=><span key={h}>{h}h</span>)}
       </div>
     </div>
   );
 }
 
-// ── StepPicker ────────────────────────────────────────────────────────────────
-function StepPicker({value,onChange,T}){
+// ── THEME TOGGLE ──────────────────────────────────────────────────────────────
+function ThemeToggle({dark,onToggle,T}){
   return(
-    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-      {STEPS.map(s=>{
-        const active=s.minutes===value;
-        return(
-          <button key={s.minutes} onClick={()=>onChange(s.minutes)} style={{
-            background:active?"#FF6B2B":T.bgCard,
-            border:`1px solid ${active?"#FF6B2B":T.border}`,
-            borderRadius:8,padding:"9px 14px",minHeight:44,
-            color:active?"#000":T.textMuted,
-            fontFamily:"'Space Mono',monospace",fontSize:11,
-            letterSpacing:0.5,cursor:"pointer",fontWeight:active?"bold":"normal",
-            transition:"all 0.12s",
-          }}>{s.label}</button>
-        );
-      })}
-    </div>
+    <button onClick={onToggle} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:`1px solid ${T.border}`,borderRadius:24,padding:"8px 14px",minHeight:44}}>
+      <span style={{fontSize:15}}>{dark?"☀️":"🌙"}</span>
+      <div style={{width:36,height:20,borderRadius:10,background:dark?"#444":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
+        <div style={{position:"absolute",top:3,left:dark?16:3,width:14,height:14,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
+      </div>
+    </button>
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
-const DEFAULT_TASKS=[
-  {id:1,name:"Sleep",hours:8,color:COLORS[0]},
-  {id:2,name:"Work",hours:6,color:COLORS[1]},
-  {id:3,name:"Exercise",hours:1,color:COLORS[2]},
+// ── ACTION BUTTON ─────────────────────────────────────────────────────────────
+function ActionBtn({label,onClick,accent,danger,dark,T}){
+  return(
+    <button onClick={onClick} style={{
+      background: accent?"#FF6B2B22": danger?(dark?"#3a0a0a":"#e8c0c0"): (dark?"#0e0e10":"#d0cec8"),
+      border:`1px solid ${accent?"#FF6B2B":danger?"#ff5555":(dark?"#505055":"#a8a6a0")}`,
+      borderRadius:10,padding:"12px 10px",minHeight:48,
+      color:accent?"#FF6B2B":danger?"#ff7777":(dark?"#cccccc":"#2a2a2a"),
+      fontFamily:"'Space Mono',monospace",fontSize:10,
+      letterSpacing:0.5,transition:"all 0.12s",width:"100%",
+    }}
+      onTouchStart={e=>e.currentTarget.style.opacity="0.7"}
+      onTouchEnd={e=>e.currentTarget.style.opacity="1"}
+    >{label}</button>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+const DEF=[
+  {id:1,name:"Sleep",hours:8,color:PALETTE[0],locked:false,actual:0},
+  {id:2,name:"Work",hours:6,color:PALETTE[1],locked:false,actual:0},
+  {id:3,name:"Exercise",hours:1,color:PALETTE[2],locked:false,actual:0},
 ];
 
 function App(){
-  const saved=loadState();
-  const [tasks,       setTasks]       = useState(saved?.tasks       ?? DEFAULT_TASKS);
-  const [stepMinutes, setStepMinutes] = useState(saved?.stepMinutes ?? 30);
-  const [darkMode,    setDarkMode]    = useState(saved?.darkMode    ?? true);
-  const [newName,     setNewName]     = useState("");
-  const [mdView,      setMdView]      = useState(false);
-  const [showImport,  setShowImport]  = useState(false);
-  const [importText,  setImportText]  = useState("");
-  const [toast,       setToast]       = useState(null);
-  const fileRef=useRef();
-  const inputRef=useRef();
+  const sv=loadState();
+  const [tasks,     setTasks]     = useState(sv?.tasks     ?? DEF);
+  const [step,      setStep]      = useState(sv?.step      ?? 30);
+  const [dark,      setDark]      = useState(sv?.dark      ?? true);
+  const [newName,   setNewName]   = useState("");
+  const [editTask,  setEditTask]  = useState(null);
+  const [showAct,   setShowAct]   = useState(sv?.showAct   ?? false);
+  const [showTL,    setShowTL]    = useState(sv?.showTL    ?? false);
+  const [showFile,  setShowFile]  = useState(false);
+  const [showImport,setShowImport]= useState(false);
+  const [importTxt, setImportTxt] = useState("");
+  const [mdView,    setMdView]    = useState(false);
+  const [toast,     setToast]     = useState(null);
+  const fileRef=useRef(),inputRef=useRef();
+  const T=dark?DARK:LIGHT;
 
-  const T=darkMode?DARK:LIGHT;
-
-  useEffect(()=>{saveState({tasks,stepMinutes,darkMode});},[tasks,stepMinutes,darkMode]);
+  // CSS variables for slider children
   useEffect(()=>{
+    document.documentElement.style.setProperty("--bg-slider",T.bgSlider);
+    document.documentElement.style.setProperty("--border-mid",T.borderMid);
     document.body.style.background=T.bg;
-    document.body.style.color=T.text;
-    const meta=document.getElementById("themeColorMeta");
-    if(meta) meta.content=T.themeColor;
-  },[darkMode]);
+    document.getElementById("themeColorMeta").content=T.tc;
+  },[dark]);
+
+  useEffect(()=>{save({tasks,step,dark,showAct,showTL});},[tasks,step,dark,showAct,showTL]);
 
   const total=tasks.reduce((s,t)=>s+t.hours,0);
-  const remaining=TOTAL_HOURS-total;
-  const overflowed=remaining<-0.001;
-  const perfect=Math.abs(remaining)<0.001;
+  const remaining=TOTAL-total;
+  const over=remaining<-0.001,perfect=Math.abs(remaining)<0.001;
 
-  const showToast=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2600);};
+  const toast2=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2500);};
 
   const addTask=()=>{
-    const name=newName.trim();
-    if(!name)return;
-    if(tasks.find(t=>t.name.toLowerCase()===name.toLowerCase())){showToast("Task already exists","err");return;}
-    setTasks(prev=>[...prev,{id:Date.now(),name,hours:Math.max(0,snapToStep(Math.min(stepMinutes/60,remaining),stepMinutes)),color:COLORS[prev.length%COLORS.length]}]);
-    setNewName("");
-    inputRef.current?.blur();
+    const name=newName.trim();if(!name)return;
+    if(tasks.find(t=>t.name.toLowerCase()===name.toLowerCase())){toast2("Task already exists","err");return;}
+    const h=Math.max(0,snap(Math.min(step/60,remaining),step));
+    setTasks(p=>[...p,{id:Date.now(),name,hours:h,color:PALETTE[p.length%PALETTE.length],locked:false,actual:0}]);
+    setNewName("");inputRef.current?.blur();
   };
-  const updateHours=(id,h)=>setTasks(prev=>prev.map(t=>t.id===id?{...t,hours:h}:t));
-  const deleteTask=(id)=>setTasks(prev=>prev.filter(t=>t.id!==id));
+
+  const upd=(id,patch)=>setTasks(p=>p.map(t=>t.id===id?{...t,...patch}:t));
+  const del=(id)=>setTasks(p=>p.filter(t=>t.id!==id));
+  const move=(id,dir)=>setTasks(p=>{
+    const i=p.findIndex(t=>t.id===id);if(i<0)return p;
+    const ni=i+dir;if(ni<0||ni>=p.length)return p;
+    const a=[...p];[a[i],a[ni]]=[a[ni],a[i]];return a;
+  });
+
+  const distribute=()=>{
+    const unlocked=tasks.filter(t=>!t.locked);
+    if(!unlocked.length)return;
+    const lockedH=tasks.filter(t=>t.locked).reduce((s,t)=>s+t.hours,0);
+    const each=snap((TOTAL-lockedH)/unlocked.length,step);
+    setTasks(p=>p.map(t=>t.locked?t:{...t,hours:each}));
+    toast2("Distributed evenly ✓");
+  };
 
   const exportMD=()=>{
     const blob=new Blob([serializeMD(tasks)],{type:"text/markdown"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.download="sliders.md";a.click();
-    URL.revokeObjectURL(url);showToast("sliders.md exported!");
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="sliders.md";a.click();URL.revokeObjectURL(url);
+    toast2("sliders.md exported!");
   };
-  const handleFileUpload=(e)=>{
-    const file=e.target.files[0];if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const parsed=parseMD(ev.target.result);
-      if(!parsed.length){showToast("No tasks found","err");return;}
-      setTasks(parsed);showToast(`Loaded ${parsed.length} tasks`);
-    };
-    reader.readAsText(file);e.target.value="";
+  const handleFile=(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{const p=parseMD(ev.target.result);if(!p.length){toast2("No tasks found in file","err");return;}setTasks(p);toast2(`${p.length} tasks loaded`);};
+    r.readAsText(f);e.target.value="";
   };
-  const handlePasteImport=()=>{
-    const parsed=parseMD(importText);
-    if(!parsed.length){showToast("No tasks found","err");return;}
-    setTasks(parsed);setShowImport(false);setImportText("");showToast(`Loaded ${parsed.length} tasks`);
+  const pasteImport=()=>{
+    const p=parseMD(importTxt);if(!p.length){toast2("No tasks found","err");return;}
+    setTasks(p);setShowImport(false);setImportTxt("");toast2(`${p.length} tasks loaded`);
   };
 
-  const SLabel=({children,mt})=>(
-    <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10,marginTop:mt||0,fontFamily:"'Space Mono',monospace"}}>{children}</div>
-  );
-
-  const ActionBtn=({label,onClick,accent,danger})=>(
-    <button onClick={onClick} style={{
-      background:accent?"#FF6B2B22":T.bgCard,
-      border:`1px solid ${accent?"#FF6B2B":danger?"#ff444440":T.border}`,
-      borderRadius:8,padding:"11px 14px",minHeight:44,
-      color:accent?"#FF6B2B":danger?"#f07070":T.textMuted,
-      fontFamily:"'Space Mono',monospace",fontSize:10,
-      letterSpacing:0.8,cursor:"pointer",transition:"all 0.12s",
-      WebkitTapHighlightColor:"transparent",
-    }}
-      onTouchStart={e=>{e.currentTarget.style.opacity="0.7";}}
-      onTouchEnd={e=>{e.currentTarget.style.opacity="1";}}
-    >{label}</button>
-  );
+  const SL=({children,mt})=><div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10,marginTop:mt||0,fontFamily:"'Space Mono',monospace"}}>{children}</div>;
 
   return(
-    <div className="main-wrap" style={{minHeight:"100vh",minHeight:"100dvh",background:T.bg,color:T.text,fontFamily:"'Space Mono',monospace",maxWidth:520,margin:"0 auto",paddingBottom:100,transition:"background 0.25s,color 0.25s",animation:"fadeIn 0.3s ease"}}>
+    <div className="main-wrap" style={{minHeight:"100dvh",background:T.bg,color:T.text,fontFamily:"'Space Mono',monospace",maxWidth:520,margin:"0 auto",paddingBottom:100,transition:"background 0.25s,color 0.25s"}}>
 
-      {/* ── Header ── */}
-      <div style={{padding:"env(safe-area-inset-top,0px) 0 0",background:T.bg,position:"sticky",top:0,zIndex:20,transition:"background 0.25s"}}>
-        <div style={{padding:"18px 18px 14px",borderBottom:`1px solid ${T.border}`}}>
+      {/* ── HEADER ── */}
+      <div style={{background:T.bg,position:"sticky",top:0,zIndex:20,transition:"background 0.25s"}}>
+        <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${T.border}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:3,color:"#FF6B2B",lineHeight:1}}>SLIDERS</h1>
-              <div style={{fontSize:10,color:T.textDim,letterSpacing:1.5,marginTop:2}}>TIME ALLOCATOR · AUTO-SAVED</div>
+              <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginTop:2}}>TIME ALLOCATOR · AUTO-SAVED</div>
             </div>
             <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-              <ThemeToggle dark={darkMode} onToggle={()=>setDarkMode(v=>!v)} T={T}/>
+              <ThemeToggle dark={dark} onToggle={()=>setDark(v=>!v)} T={T}/>
               <div style={{textAlign:"right"}}>
-                <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1,color:overflowed?"#ff4444":perfect?"#4ECDC4":T.textSub}}>
-                  {perfect?"24h ✓":hoursToDisplay(Math.abs(remaining))}
+                <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub}}>
+                  {perfect?"24h ✓":hm(Math.abs(remaining))}
                 </div>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1,marginTop:1}}>
-                  {overflowed?"OVER BY":perfect?"FULLY ALLOCATED":"REMAINING"}
-                </div>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1}}>{over?"OVER BY":perfect?"FULLY ALLOCATED":"REMAINING"}</div>
               </div>
             </div>
           </div>
-          {overflowed&&(
-            <div style={{marginTop:10,padding:"8px 12px",background:"#ff444412",border:"1px solid #ff444430",borderRadius:8,fontSize:11,color:"#ff7777",letterSpacing:0.3}}>
-              ⚠ Over by {hoursToDisplay(Math.abs(remaining))} — reduce some sliders
-            </div>
-          )}
+          {over&&<div style={{marginTop:10,padding:"8px 12px",background:"#ff444412",border:"1px solid #ff444430",borderRadius:8,fontSize:11,color:"#ff7777"}}>⚠ Over by {hm(Math.abs(remaining))}</div>}
         </div>
       </div>
 
       <div style={{padding:"0 16px"}}>
 
-        {/* ── Donut + legend ── */}
-        <div className="donut-section" style={{display:"flex",alignItems:"center",gap:16,margin:"16px 0",padding:16,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,transition:"background 0.2s"}}>
-          <DonutChart tasks={tasks} T={T}/>
+        {/* ── DONUT + LEGEND ── */}
+        <div style={{display:"flex",alignItems:"center",gap:16,margin:"16px 0",padding:16,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,transition:"background 0.2s"}}>
+          <Donut tasks={tasks} T={T}/>
           <div style={{flex:1,overflow:"hidden",minWidth:0}}>
             {tasks.map(t=>(
-              <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-                <div style={{width:9,height:9,borderRadius:"50%",background:t.color,flexShrink:0}}/>
-                <span style={{fontSize:11,color:T.textMuted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
-                <span style={{fontSize:11,color:t.color,flexShrink:0,fontWeight:"bold"}}>{((t.hours/TOTAL_HOURS)*100).toFixed(0)}%</span>
+              <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                <div style={{width:9,height:9,borderRadius:2,background:t.color,flexShrink:0}}/>
+                <span style={{fontSize:11,color:T.textSub,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+                <span style={{fontSize:11,color:t.color,flexShrink:0,fontWeight:"bold"}}>{((t.hours/TOTAL)*100).toFixed(0)}%</span>
               </div>
             ))}
             {remaining>0.001&&(
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:9,height:9,borderRadius:"50%",background:T.donutFree,border:`1px solid ${T.donutFreeB}`,flexShrink:0}}/>
-                <span style={{fontSize:11,color:T.textDim,flex:1}}>Unallocated</span>
-                <span style={{fontSize:11,color:T.textDim}}>{hoursToDisplay(remaining)}</span>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <div style={{width:9,height:9,borderRadius:2,background:T.donutFree,border:`1px solid ${T.borderMid}`,flexShrink:0}}/>
+                <span style={{fontSize:11,color:T.textMuted,flex:1}}>Unallocated</span>
+                <span style={{fontSize:11,color:T.textMuted}}>{hm(remaining)}</span>
               </div>
             )}
             {tasks.length===0&&<span style={{fontSize:11,color:T.textFaint}}>No tasks yet</span>}
           </div>
         </div>
 
-        {/* ── Step picker ── */}
-        <div style={{marginBottom:20}}>
-          <SLabel>STEP SIZE</SLabel>
-          <StepPicker value={stepMinutes} onChange={setStepMinutes} T={T}/>
-        </div>
+        {/* ── TIMELINE (above quick actions) ── */}
+        {showTL&&<Timeline tasks={tasks} T={T} showActual={showAct}/>}
 
-        {/* ── Sliders ── */}
-        <div style={{marginBottom:16}}>
-          <SLabel>TASKS — DRAG TO ALLOCATE</SLabel>
-          {tasks.length===0&&(
-            <div style={{textAlign:"center",padding:"32px 0",fontSize:11,color:T.textFaint,letterSpacing:1.5}}>NO TASKS YET — ADD ONE BELOW</div>
-          )}
-          {tasks.map(t=>(
-            <SliderRow key={t.id} task={t} stepMinutes={stepMinutes} T={T}
-              onChange={h=>updateHours(t.id,h)}
-              onDelete={()=>deleteTask(t.id)}/>
+        {/* ── QUICK ACTIONS ── */}
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {label:showTL?"▲ TIMELINE":"▼ TIMELINE",onClick:()=>setShowTL(v=>!v)},
+            {label:showAct?"PLANNED ONLY":"+ ACTUAL",onClick:()=>setShowAct(v=>!v)},
+            {label:"⇄ DISTRIBUTE",onClick:distribute},
+          ].map(b=>(
+            <button key={b.label} onClick={b.onClick} style={{
+              background:dark?"#0e0e10":"#d0cec8",
+              border:`1px solid ${dark?"#505055":"#a8a6a0"}`,
+              borderRadius:8,
+              padding:"9px 14px",minHeight:40,
+              color:dark?"#cccccc":"#2a2a2a",
+              fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:0.5,flex:1,
+            }}
+              onTouchStart={e=>e.currentTarget.style.opacity="0.7"}
+              onTouchEnd={e=>e.currentTarget.style.opacity="1"}
+            >{b.label}</button>
           ))}
         </div>
 
-        {/* ── Add task ── */}
+        {/* ── STEP SIZE ── */}
+        <div style={{marginBottom:18}}>
+          <SL>STEP SIZE</SL>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {STEPS.map(s=>{
+              const active=s.m===step;
+              return<button key={s.m} onClick={()=>setStep(s.m)} style={{background:active?(dark?"#5a5a62":"#b8b6b0"):T.bgCard,border:`1px solid ${active?(dark?"#7a7a82":"#8a8880"):T.border}`,borderRadius:8,padding:"9px 14px",minHeight:44,color:active?(dark?"#ffffff":"#111111"):T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:11,fontWeight:active?"bold":"normal"}}>{s.l}</button>;
+            })}
+          </div>
+        </div>
+
+        {/* ── TASKS ── */}
+        <div style={{marginBottom:16}}>
+          <SL>TASKS — DRAG TO ALLOCATE</SL>
+          {tasks.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:11,color:T.textFaint,letterSpacing:1.5}}>NO TASKS YET — ADD ONE BELOW</div>}
+          {tasks.map((t,i)=>(
+            <TaskCard key={t.id} task={t} stepMinutes={step} T={T} showActual={showAct}
+              onChange={nt=>upd(t.id,nt)}
+              onDelete={()=>del(t.id)}
+              onEdit={()=>setEditTask(t)}
+              onLock={()=>upd(t.id,{locked:!t.locked})}
+            />
+          ))}
+        </div>
+
+        {/* ── ADD TASK ── */}
         <div style={{display:"flex",gap:10,marginBottom:24}}>
-          <input ref={inputRef} value={newName}
-            onChange={e=>setNewName(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&addTask()}
-            placeholder="New task name..."
-            style={{
-              flex:1,background:T.bgInput,border:`1px solid ${T.border}`,
-              borderRadius:10,padding:"13px 16px",color:T.text,
-              fontFamily:"'Space Mono',monospace",fontSize:14,
-              letterSpacing:0.3,transition:"background 0.2s,border-color 0.2s",
-              WebkitAppearance:"none",
-            }}/>
-          <button onClick={addTask} style={{
-            background:"#FF6B2B",border:"none",borderRadius:10,
-            padding:"13px 20px",color:"#000",
-            fontFamily:"'Space Mono',monospace",fontSize:13,
-            fontWeight:"bold",cursor:"pointer",letterSpacing:0.5,
-            flexShrink:0,minWidth:80,
-            WebkitTapHighlightColor:"transparent",
-          }}
+          <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="New task name..."
+            style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:"'Space Mono',monospace",fontSize:14,transition:"background 0.2s"}}/>
+          <button onClick={addTask} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 20px",color:"#000",fontFamily:"'Space Mono',monospace",fontSize:13,fontWeight:"bold",flexShrink:0,minWidth:80,minHeight:52}}
             onTouchStart={e=>e.currentTarget.style.opacity="0.8"}
             onTouchEnd={e=>e.currentTarget.style.opacity="1"}
           >+ ADD</button>
         </div>
 
-        {/* ── File actions ── */}
-        <SLabel>FILE — .MD FORMAT</SLabel>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-          <ActionBtn label="⬇ EXPORT .MD" onClick={exportMD} accent/>
-          <ActionBtn label="⬆ IMPORT .MD" onClick={()=>fileRef.current.click()}/>
-          <ActionBtn label="✎ PASTE MD"   onClick={()=>setShowImport(v=>!v)}/>
-          <ActionBtn label={mdView?"◀ HIDE MD":"▶ VIEW MD"} onClick={()=>setMdView(v=>!v)}/>
-          <div style={{gridColumn:"1/-1"}}>
-            <ActionBtn label="✕ CLEAR ALL TASKS" onClick={()=>{setTasks([]);showToast("Cleared all tasks");}} danger/>
+        {/* ── FILE SECTION ── */}
+        <button onClick={()=>setShowFile(v=>!v)} style={{width:"100%",background:dark?"#0e0e10":"#d0cec8",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:10,padding:"12px 16px",color:dark?"#cccccc":"#2a2a2a",fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>FILE</span>
+          <span style={{fontSize:14}}>{showFile?"▲":"▼"}</span>
+        </button>
+        {showFile&&(
+          <div style={{animation:"slideIn 0.2s ease"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+              <ActionBtn label="⬇ EXPORT .MD" onClick={exportMD} accent dark={dark} T={T}/>
+              <ActionBtn label="⬆ IMPORT .MD" onClick={()=>fileRef.current.click()} dark={dark} T={T}/>
+              <ActionBtn label="✎ PASTE MD" onClick={()=>setShowImport(v=>!v)} dark={dark} T={T}/>
+              <ActionBtn label={mdView?"◀ HIDE MD":"▶ VIEW MD"} onClick={()=>setMdView(v=>!v)} dark={dark} T={T}/>
+              <div style={{gridColumn:"1/-1"}}><ActionBtn label="✕ CLEAR ALL TASKS" onClick={()=>{setTasks([]);toast2("All tasks cleared");}} danger dark={dark} T={T}/></div>
+            </div>
+            <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
+            {showImport&&(
+              <div style={{marginBottom:12}}>
+                <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)}
+                  placeholder={"Paste sliders.md content here...\n\nFormat:\n## Task name [8.0000h] #FF6B2B"}
+                  style={{width:"100%",height:150,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,color:T.textSub,fontFamily:"'Space Mono',monospace",fontSize:12,lineHeight:1.7,marginBottom:8,resize:"none"}}/>
+                <button onClick={pasteImport} style={{width:"100%",background:"#4ECDC420",border:"1px solid #4ECDC4",borderRadius:8,padding:"12px",color:"#4ECDC4",fontFamily:"'Space Mono',monospace",fontSize:11,minHeight:44}}>LOAD</button>
+              </div>
+            )}
+            {mdView&&(
+              <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginBottom:12}}>
+                <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:8}}>LIVE PREVIEW</div>
+                <pre style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textMuted,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{serializeMD(tasks)}</pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── INFO ── */}
+        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginBottom:16,marginTop:16}}>
+          <div style={{fontSize:11,color:T.textDim,lineHeight:1.9}}>
+            🔒 Lock a task to prevent accidental slider changes<br/>
+            ⇄ Distribute = split time equally across unlocked tasks<br/>
+            ✏️ Tap the name or color dot to edit a task<br/>
+            💾 Auto-saved · Export .MD to sync across devices
           </div>
         </div>
-        <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFileUpload}/>
 
-        {/* ── Paste import ── */}
-        {showImport&&(
-          <div style={{marginBottom:16,animation:"slideIn 0.2s ease"}}>
-            <textarea value={importText} onChange={e=>setImportText(e.target.value)}
-              placeholder={"Paste sliders.md content here...\n\nFormat:\n## Task Name [8.0000h] #FF6B2B"}
-              style={{
-                width:"100%",height:160,background:T.bgCard,
-                border:`1px solid ${T.border}`,borderRadius:10,
-                padding:14,color:T.textSub,
-                fontFamily:"'Space Mono',monospace",fontSize:12,
-                lineHeight:1.7,marginBottom:10,resize:"none",
-                transition:"background 0.2s",
-              }}/>
-            <button onClick={handlePasteImport} style={{
-              background:"#4ECDC420",border:"1px solid #4ECDC4",borderRadius:8,
-              padding:"12px 20px",color:"#4ECDC4",
-              fontFamily:"'Space Mono',monospace",fontSize:11,
-              cursor:"pointer",letterSpacing:0.8,minHeight:44,width:"100%",
-            }}>LOAD FROM PASTE</button>
-          </div>
-        )}
-
-        {/* ── MD preview ── */}
-        {mdView&&(
-          <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:16,marginBottom:16,animation:"slideIn 0.2s ease",transition:"background 0.2s"}}>
-            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10}}>sliders.md — LIVE PREVIEW</div>
-            <pre style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textMuted,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{serializeMD(tasks)}</pre>
-          </div>
-        )}
-
-        {/* ── Storage info ── */}
-        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:16,marginTop:4,marginBottom:16,transition:"background 0.2s"}}>
-          <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10}}>STORAGE INFO</div>
-          <div style={{fontSize:11,color:T.textDim,lineHeight:2}}>
-            💾 Saved to <span style={{color:T.textSub}}>localStorage</span> — survives closing.<br/>
-            🔄 Use <span style={{color:T.textSub}}>Export .MD</span> to sync across devices.<br/>
-            📋 Format: <span style={{color:T.textSub}}>## Name [8h] #FF6B2B</span>
-          </div>
+        {/* ── FOOTER ── */}
+        {/* maintained by Peter Vincent — https://github.com/vpeter56/Sliders.html */}
+        <div style={{textAlign:"center",padding:"8px 0 4px"}}>
+          <a href="https://github.com/vpeter56/Sliders.html" target="_blank" rel="noopener noreferrer"
+            style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textFaint,textDecoration:"none",letterSpacing:0.5}}>
+            maintained by Peter Vincent
+          </a>
         </div>
       </div>
+      {editTask&&(
+        <EditModal task={editTask} T={T}
+          onSave={nt=>{upd(nt.id,nt);setEditTask(null);toast2("Task updated ✓");}}
+          onClose={()=>setEditTask(null)}/>
+      )}
 
-      {/* ── Toast (bottom center on mobile) ── */}
+      {/* ── TOAST ── */}
       {toast&&(
-        <div style={{
-          position:"fixed",bottom:"calc(24px + env(safe-area-inset-bottom,0px))",
-          left:"50%",transform:"translateX(-50%)",
-          zIndex:100,
-          background:toast.type==="err"?"#ff444420":"#FF6B2B20",
-          border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`,
-          borderRadius:24,padding:"12px 22px",
-          fontFamily:"'Space Mono',monospace",fontSize:12,
-          color:toast.type==="err"?"#ff7777":"#FF6B2B",
-          animation:"toastIn 0.2s ease",
-          letterSpacing:0.4,
-          whiteSpace:"nowrap",
-          backdropFilter:"blur(8px)",
-          WebkitBackdropFilter:"blur(8px)",
-        }}>{toast.msg}</div>
+        <div style={{position:"fixed",bottom:"calc(20px + env(safe-area-inset-bottom,0px))",left:"50%",transform:"translateX(-50%)",zIndex:200,background:toast.type==="err"?"#ff444422":"#FF6B2B22",border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`,borderRadius:24,padding:"12px 22px",fontFamily:"'Space Mono',monospace",fontSize:12,color:toast.type==="err"?"#ff7777":"#FF6B2B",animation:"toastIn 0.2s ease",whiteSpace:"nowrap",backdropFilter:"blur(8px)"}}>
+          {toast.msg}
+        </div>
       )}
     </div>
   );
