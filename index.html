@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{min-height:100dvh;transition:background 0.25s;overscroll-behavior:none;}
+html,body{min-height:100dvh;background:#1c1c1e;color:#f5f5f5;transition:background 0.25s;overscroll-behavior:none;}
 textarea,input{outline:none;-webkit-appearance:none;appearance:none;}
 button{-webkit-appearance:none;appearance:none;touch-action:manipulation;cursor:pointer;}
 input[type="text"],input[type="color"],textarea{font-size:16px!important;}
@@ -29,56 +29,86 @@ input[type="text"],input[type="color"],textarea{font-size:16px!important;}
 @media(min-width:900px){.main-wrap{max-width:720px!important;}}
 </style>
 </head>
-<body>
+<body style="background:#1c1c1e">
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useRef,useEffect,useCallback,useReducer}=React;
 
 const TOTAL=24;
-const KEY="sliders_v4";
+const KEY="sliders_v5";
 const PALETTE=["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
 const STEPS=[{l:"1m",m:1},{l:"2m",m:2},{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30},{l:"1h",m:60}];
 const DARK={bg:"#1c1c1e",bgCard:"#2a2a2e",bgInput:"#323236",bgSlider:"#3a3a3e",border:"#424246",borderMid:"#505055",text:"#f5f5f5",textSub:"#d8d8d8",textMuted:"#aaaaaa",textDim:"#888",textFaint:"#666",donutFree:"#3a3a3e",tc:"#1c1c1e"};
 const LIGHT={bg:"#f4f3ef",bgCard:"#eceae4",bgInput:"#e4e2db",bgSlider:"#d8d6cf",border:"#cac8c1",borderMid:"#bbb9b2",text:"#1a1a1a",textSub:"#2e2e2e",textMuted:"#555",textDim:"#777",textFaint:"#999",donutFree:"#d8d6cf",tc:"#f4f3ef"};
 
 const DEF_TASKS=[
-  {id:1,name:"Sleep",hours:8,color:PALETTE[0],locked:false,actual:0},
-  {id:2,name:"Work",hours:6,color:PALETTE[1],locked:false,actual:0},
-  {id:3,name:"Exercise",hours:1,color:PALETTE[2],locked:false,actual:0},
+  {id:1,name:"Sleep",hours:8,originalHours:8,color:PALETTE[0],locked:false,actual:0},
+  {id:2,name:"Work",hours:6,originalHours:6,color:PALETTE[1],locked:false,actual:0},
+  {id:3,name:"Exercise",hours:1,originalHours:1,color:PALETTE[2],locked:false,actual:0},
 ];
 
-// ── pure helpers ──────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 function hm(h){
   const m=Math.round(h*60),H=Math.floor(m/60),M=m%60;
   if(H===0)return`${M}m`;if(M===0)return`${H}h`;return`${H}h ${M}m`;
 }
 function snap(h,s){return Math.round(h*60/s)*s/60;}
+function rds(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}catch{return null;}}
+function wrs(s){try{localStorage.setItem(KEY,JSON.stringify(s));}catch{}}
 
-function readStorage(){
-  try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}catch{return null;}
-}
-function writeStorage(s){
-  try{localStorage.setItem(KEY,JSON.stringify(s));}catch{}
+// ── Proportional scaling ──────────────────────────────────────────────────────
+// Scale tasks so their hours sum to targetTotal, preserving original proportions.
+// Uses originalHours as the weight reference.
+// Any rounding remainder is added to the largest task to keep sum exact.
+function scaleTasksToTotal(tasks, targetTotal) {
+  if(tasks.length === 0) return tasks;
+  const origSum = tasks.reduce((s,t)=>(t.originalHours||t.hours)+s, 0);
+  if(origSum <= 0) return tasks;
+  // Convert to minutes for integer rounding
+  const targetMin = Math.round(targetTotal * 60);
+  const origSumMin = origSum * 60;
+  // Calculate each task's new minutes
+  let assigned = 0;
+  const newMins = tasks.map((t,i) => {
+    if(i === tasks.length-1) {
+      // Last task gets remainder to ensure exact total
+      return targetMin - assigned;
+    }
+    const m = Math.round((t.originalHours || t.hours) / origSum * targetMin);
+    assigned += m;
+    return m;
+  });
+  return tasks.map((t,i)=>({...t, hours: Math.max(0, newMins[i]/60)}));
 }
 
 function parseMD(text){
   const tasks=[];
   for(const line of text.split("\n")){
     const m=line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6})?/);
-    if(m) tasks.push({id:Date.now()+Math.random(),name:m[1].trim(),hours:parseFloat(m[2]),color:m[3]||PALETTE[tasks.length%PALETTE.length],locked:false,actual:0});
+    if(m) tasks.push({
+      id:Date.now()+Math.random(),
+      name:m[1].trim(),
+      hours:parseFloat(m[2]),
+      originalHours:parseFloat(m[2]),
+      color:m[3]||PALETTE[tasks.length%PALETTE.length],
+      locked:false,actual:0
+    });
   }
   return tasks;
 }
-function serializeMD(tasks){
-  const total=tasks.reduce((s,t)=>s+t.hours,0),unalloc=Math.max(0,TOTAL-total);
-  let out=`# Sliders — Daily Time Allocation\n\n> Total: ${hm(total)} / 24h | Unallocated: ${hm(unalloc)}\n\n---\n\n`;
-  for(const t of tasks) out+=`## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${hm(t.hours)} (${((t.hours/TOTAL)*100).toFixed(1)}%)\n- Actual: ${hm(t.actual||0)}\n\n`;
+function serializeMD(tasks, dayStart=0, dayEnd=24){
+  const dayLen=dayEnd-dayStart;
+  const total=tasks.reduce((s,t)=>s+t.hours,0),unalloc=Math.max(0,dayLen-total);
+  let out=`# Sliders — Daily Time Allocation\n\n`;
+  out+=`> Day: ${String(dayStart).padStart(2,'0')}:00 → ${String(dayEnd).padStart(2,'0')}:00 (${hm(dayLen)})\n`;
+  out+=`> Total: ${hm(total)} / ${hm(dayLen)} | Unallocated: ${hm(unalloc)}\n\n---\n\n`;
+  for(const t of tasks) out+=`## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${hm(t.hours)} (${((t.hours/dayLen)*100).toFixed(1)}%)\n- Actual: ${hm(t.actual||0)}\n\n`;
   return out+`---\n_Generated by Sliders App_\n`;
 }
 
-// ── useReducer — single state atom, no stale closures ─────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 function initState(){
-  const s=readStorage();
+  const s=rds();
   return {
     tasks:   s?.tasks   ?? DEF_TASKS,
     favs:    s?.favs    ?? [],
@@ -86,28 +116,35 @@ function initState(){
     dark:    s?.dark    ?? true,
     showAct: s?.showAct ?? false,
     showTL:  s?.showTL  ?? false,
+    dayStart:s?.dayStart?? 0,
+    dayEnd:  s?.dayEnd  ?? 24,
   };
 }
 
 function reducer(state,action){
+  const dayLen = state.dayEnd - state.dayStart;
   switch(action.type){
 
     case 'ADD_TASK':{
       const {name,color,hours}=action;
       const fav=state.favs.find(f=>f.name.toLowerCase()===name.toLowerCase());
       const total=state.tasks.reduce((s,t)=>s+t.hours,0);
-      const rem=TOTAL-total;
+      const rem=dayLen-total;
       const h=hours!==undefined?hours:fav?fav.hours:Math.max(0,snap(Math.min(state.step/60,rem),state.step));
       const c=color||fav?.color||PALETTE[state.tasks.length%PALETTE.length];
-      return {...state,tasks:[...state.tasks,{id:Date.now(),name,hours:h,color:c,locked:false,actual:0}]};
+      return {...state,tasks:[...state.tasks,{id:Date.now(),name,hours:h,originalHours:h,color:c,locked:false,actual:0}]};
     }
 
     case 'UPD_TASK':{
-      const tasks=state.tasks.map(t=>t.id===action.id?{...t,...action.patch}:t);
-      // sync fav hours/color if this task is a favourite
-      const changed=action.patch.hours!==undefined||action.patch.color!==undefined;
+      const tasks=state.tasks.map(t=>{
+        if(t.id!==action.id) return t;
+        const updated={...t,...action.patch};
+        // When user manually moves a slider, update originalHours too
+        if(action.patch.hours!==undefined) updated.originalHours=action.patch.hours;
+        return updated;
+      });
       let favs=state.favs;
-      if(changed){
+      if(action.patch.hours!==undefined||action.patch.color!==undefined){
         const t=state.tasks.find(t=>t.id===action.id);
         if(t&&state.favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase())){
           favs=state.favs.map(f=>f.name.toLowerCase()===t.name.toLowerCase()
@@ -137,8 +174,17 @@ function reducer(state,action){
       const unlocked=state.tasks.filter(t=>!t.locked);
       if(!unlocked.length) return state;
       const lockedH=state.tasks.filter(t=>t.locked).reduce((s,t)=>s+t.hours,0);
-      const each=snap((TOTAL-lockedH)/unlocked.length,state.step);
-      return {...state,tasks:state.tasks.map(t=>t.locked?t:{...t,hours:each})};
+      const each=snap((dayLen-lockedH)/unlocked.length,state.step);
+      return {...state,tasks:state.tasks.map(t=>t.locked?t:{...t,hours:each,originalHours:each})};
+    }
+
+    case 'SET_DAY_WINDOW':{
+      const {start,end}=action;
+      const newLen=end-start;
+      if(newLen<=0) return state;
+      // Scale all tasks proportionally to new day length
+      const scaled=scaleTasksToTotal(state.tasks, newLen);
+      return {...state,dayStart:start,dayEnd:end,tasks:scaled};
     }
 
     case 'SET_STEP':    return {...state,step:action.step};
@@ -150,9 +196,192 @@ function reducer(state,action){
   }
 }
 
-// ── UI components ─────────────────────────────────────────────────────────────
+// ── Circular Day Window Slider ────────────────────────────────────────────────
+// Wraps around the donut. Two handles: start (green) and end (orange).
+// Hours 0-24 mapped to 0-360 degrees, starting from top (-90deg).
+function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
+  const SIZE = 200;   // SVG canvas size
+  const CX = 100, CY = 100;
+  const R_TRACK = 88; // radius of the ring track
+  const R_THUMB = 9;  // radius of drag handles
+  const STROKE = 10;  // track stroke width
 
-function Slider({value,max=TOTAL,color,step,locked,onChange}){
+  const svgRef = useRef();
+  const dragging = useRef(null); // 'start' | 'end' | null
+
+  // Convert hour (0-24) to angle in radians, 0h = top = -PI/2
+  const hourToAngle = h => (h / 24) * 2 * Math.PI - Math.PI / 2;
+
+  // Convert angle (rad) to hour (0-24), snapped to 0.5h
+  const angleToHour = a => {
+    let deg = ((a + Math.PI / 2) / (2 * Math.PI) * 24 + 24) % 24;
+    return Math.round(deg * 2) / 2; // 30-min snap
+  };
+
+  const aStart = hourToAngle(dayStart);
+  const aEnd   = hourToAngle(dayEnd);
+
+  // Arc path from aStart to aEnd (the active window)
+  const arcPath = (a1, a2) => {
+    // Ensure arc goes clockwise from a1 to a2
+    let da = ((a2 - a1) + 2*Math.PI) % (2*Math.PI);
+    if(da === 0) da = 2*Math.PI; // full circle
+    const large = da > Math.PI ? 1 : 0;
+    const x1 = CX + R_TRACK * Math.cos(a1);
+    const y1 = CY + R_TRACK * Math.sin(a1);
+    const x2 = CX + R_TRACK * Math.cos(a2);
+    const y2 = CY + R_TRACK * Math.sin(a2);
+    return `M ${x1} ${y1} A ${R_TRACK} ${R_TRACK} 0 ${large} 1 ${x2} ${y2}`;
+  };
+
+  const thumbPos = (a) => ({
+    x: CX + R_TRACK * Math.cos(a),
+    y: CY + R_TRACK * Math.sin(a),
+  });
+  const tStart = thumbPos(aStart);
+  const tEnd   = thumbPos(aEnd);
+
+  const getAngleFromEvent = (e) => {
+    const rect = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) / rect.width * SIZE - CX;
+    const y = (clientY - rect.top) / rect.height * SIZE - CY;
+    return Math.atan2(y, x);
+  };
+
+  const onPointerDown = (which) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragging.current = which;
+    svgRef.current.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if(!dragging.current) return;
+    const a = getAngleFromEvent(e);
+    const h = angleToHour(a);
+    if(dragging.current === 'start') {
+      // start must be < end, min 1h gap
+      const newStart = h >= dayEnd ? dayEnd - 1 : h;
+      const clamped = Math.max(0, Math.min(newStart, dayEnd - 0.5));
+      onChange(clamped, dayEnd);
+    } else {
+      // end must be > start, max 24
+      const newEnd = h <= dayStart ? dayStart + 1 : h;
+      const clamped = Math.max(dayStart + 0.5, Math.min(newEnd, 24));
+      onChange(dayStart, clamped);
+    }
+  };
+
+  const onPointerUp = () => { dragging.current = null; };
+
+  const dayLen = dayEnd - dayStart;
+  const textColor = T.text;
+  const trackBg = T.bgSlider;
+  const arcColor = "#FF6B2B";
+  const startColor = "#4ECDC4";
+  const endColor = "#FF6B2B";
+
+  // Full circle background track
+  const fullCircle = `M ${CX} ${CY-R_TRACK} A ${R_TRACK} ${R_TRACK} 0 1 1 ${CX-0.001} ${CY-R_TRACK}`;
+
+  return (
+    <svg
+      ref={svgRef}
+      width={SIZE} height={SIZE}
+      style={{display:"block",flexShrink:0,touchAction:"none",userSelect:"none"}}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+    >
+      {/* Background full ring */}
+      <path d={fullCircle} fill="none" stroke={trackBg} strokeWidth={STROKE} strokeLinecap="round"/>
+
+      {/* Active arc */}
+      <path d={arcPath(aStart, aEnd)} fill="none" stroke={arcColor} strokeWidth={STROKE} strokeLinecap="round" opacity={0.85}/>
+
+      {/* Hour tick marks at 0,6,12,18 */}
+      {[0,6,12,18].map(h=>{
+        const a=hourToAngle(h);
+        const inner=R_TRACK-STROKE/2-3, outer=R_TRACK+STROKE/2+3;
+        return <line key={h}
+          x1={CX+inner*Math.cos(a)} y1={CY+inner*Math.sin(a)}
+          x2={CX+outer*Math.cos(a)} y2={CY+outer*Math.sin(a)}
+          stroke={T.border} strokeWidth={1.5}
+        />;
+      })}
+
+      {/* Hour labels at 0,6,12,18 */}
+      {[{h:0,label:"0"},{h:6,label:"6"},{h:12,label:"12"},{h:18,label:"18"}].map(({h,label})=>{
+        const a=hourToAngle(h);
+        const lr=R_TRACK+STROKE/2+14;
+        return <text key={h}
+          x={CX+lr*Math.cos(a)} y={CY+lr*Math.sin(a)+4}
+          textAnchor="middle" fill={T.textFaint} fontSize={9}
+          fontFamily="'Space Mono',monospace"
+        >{label}</text>;
+      })}
+
+      {/* Center text */}
+      <text x={CX} y={CY-8} textAnchor="middle" fill={textColor} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(dayLen)}</text>
+      <text x={CX} y={CY+8} textAnchor="middle" fill={T.textMuted} fontSize={9} fontFamily="'Space Mono',monospace">{`${String(Math.floor(dayStart)).padStart(2,'0')}:${dayStart%1?'30':'00'}`}–{`${String(Math.floor(dayEnd)).padStart(2,'0')}:${dayEnd%1?'30':'00'}`}</text>
+
+      {/* Start handle (teal) */}
+      <circle
+        cx={tStart.x} cy={tStart.y} r={R_THUMB+4}
+        fill="transparent"
+        style={{cursor:"grab"}}
+        onPointerDown={onPointerDown('start')}
+      />
+      <circle cx={tStart.x} cy={tStart.y} r={R_THUMB} fill={startColor} stroke={T.bg} strokeWidth={2}
+        style={{cursor:"grab",filter:`drop-shadow(0 0 4px ${startColor}88)`}}
+        onPointerDown={onPointerDown('start')}
+      />
+      <text x={tStart.x} y={tStart.y+4} textAnchor="middle" fill="#000" fontSize={7} fontFamily="'Space Mono',monospace" style={{pointerEvents:"none"}}>▶</text>
+
+      {/* End handle (orange) */}
+      <circle
+        cx={tEnd.x} cy={tEnd.y} r={R_THUMB+4}
+        fill="transparent"
+        style={{cursor:"grab"}}
+        onPointerDown={onPointerDown('end')}
+      />
+      <circle cx={tEnd.x} cy={tEnd.y} r={R_THUMB} fill={endColor} stroke={T.bg} strokeWidth={2}
+        style={{cursor:"grab",filter:`drop-shadow(0 0 4px ${endColor}88)`}}
+        onPointerDown={onPointerDown('end')}
+      />
+      <text x={tEnd.x} y={tEnd.y+4} textAnchor="middle" fill="#000" fontSize={7} fontFamily="'Space Mono',monospace" style={{pointerEvents:"none"}}>◼</text>
+    </svg>
+  );
+}
+
+// ── DonutChart (inner, inside the ring) ──────────────────────────────────────
+function Donut({tasks,T,dayLen}){
+  const size=200, r=72, cx=100, cy=100, inner=45;
+  const total=tasks.reduce((s,t)=>s+t.hours,0);
+  const unalloc=Math.max(0,dayLen-total);
+  const all=[...tasks,...(unalloc>0.001?[{id:"free",hours:unalloc,color:T.donutFree}]:[])];
+  let a=-Math.PI/2;
+  return(
+    <svg width={size} height={size} style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}>
+      {all.map((t,i)=>{
+        const sw=(t.hours/dayLen)*2*Math.PI;
+        if(sw<0.002)return null;
+        const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a);a+=sw;
+        const x2=cx+r*Math.cos(a),y2=cy+r*Math.sin(a);
+        const d=`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
+        return <path key={t.id||i} d={d} fill={t.color} stroke={T.bg} strokeWidth={1.5}/>;
+      })}
+      <circle cx={cx} cy={cy} r={inner} fill={T.bg}/>
+      <text x={cx} y={cy-7} textAnchor="middle" fill={T.text} fontSize={12} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(total)}</text>
+      <text x={cx} y={cy+9} textAnchor="middle" fill={T.textMuted} fontSize={8} fontFamily="'Space Mono',monospace">allocated</text>
+    </svg>
+  );
+}
+
+// ── Linear Slider ─────────────────────────────────────────────────────────────
+function Slider({value,max,color,step,locked,onChange}){
   const ref=useRef();const drag=useRef(false);
   const get=useCallback((cx)=>{
     const r=ref.current.getBoundingClientRect();
@@ -167,7 +396,7 @@ function Slider({value,max=TOTAL,color,step,locked,onChange}){
       style={{position:"relative",height:40,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:"none",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
       <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${color}66,${color})`,borderRadius:8}}/>
-      {[6,12,18].map(h=><div key={h} style={{position:"absolute",left:`${(h/max)*100}%`,top:"15%",bottom:"15%",width:1,background:"var(--border-mid)",opacity:0.5}}/>)}
+      {[0.25,0.5,0.75].map((f,i)=><div key={i} style={{position:"absolute",left:`${f*100}%`,top:"15%",bottom:"15%",width:1,background:"var(--border-mid)",opacity:0.5}}/>)}
       <div style={{position:"absolute",left:`${pct}%`,top:"50%",transform:"translate(-50%,-50%)",width:20,height:32,background:locked?"#666":color,borderRadius:6,boxShadow:locked?"none":`0 2px 12px ${color}99`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
         {locked?<span style={{fontSize:10,color:"#fff"}}>🔒</span>:<div style={{width:2,height:12,background:"rgba(0,0,0,0.3)",borderRadius:1}}/>}
       </div>
@@ -186,8 +415,10 @@ function Btn44({onClick,danger,children,title}){
   );
 }
 
-function TaskCard({task,stepMinutes,T,onChange,onDelete,onEdit,onLock,onFav,isFav,showActual}){
+function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onFav,isFav,showActual}){
   const diff=(task.actual||0)-task.hours;
+  // tick labels evenly from 0 to dayLen
+  const ticks=[0,0.25,0.5,0.75,1].map(f=>hm(f*dayLen));
   return(
     <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,transition:"background 0.2s",opacity:task.locked?0.85:1}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
@@ -202,7 +433,7 @@ function TaskCard({task,stepMinutes,T,onChange,onDelete,onEdit,onLock,onFav,isFa
           {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete">✕</Btn44>}
         </div>
       </div>
-      <Slider value={task.hours} step={stepMinutes} color={task.color} locked={task.locked} onChange={h=>onChange({hours:h})}/>
+      <Slider value={task.hours} max={dayLen} step={stepMinutes} color={task.color} locked={task.locked} onChange={h=>onChange({hours:h})}/>
       {showActual&&(
         <div style={{marginTop:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -210,11 +441,11 @@ function TaskCard({task,stepMinutes,T,onChange,onDelete,onEdit,onLock,onFav,isFa
             <span style={{fontSize:10,color:diff>0?"#ff7777":diff<0?"#4ECDC4":T.textDim,fontFamily:"'Space Mono',monospace"}}>
               {hm(task.actual||0)}{diff!==0?` (${diff>0?"+":""}${hm(Math.abs(diff))})`:""}</span>
           </div>
-          <Slider value={task.actual||0} step={stepMinutes} color={diff>0?"#ff7777":"#4ECDC4"} locked={false} onChange={h=>onChange({actual:h})}/>
+          <Slider value={task.actual||0} max={dayLen} step={stepMinutes} color={diff>0?"#ff7777":"#4ECDC4"} locked={false} onChange={h=>onChange({actual:h})}/>
         </div>
       )}
       <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
-        {[0,6,12,18,24].map(h=><span key={h}>{h}h</span>)}
+        {ticks.map((l,i)=><span key={i}>{l}</span>)}
       </div>
     </div>
   );
@@ -250,47 +481,25 @@ function EditModal({task,T,onSave,onClose}){
   );
 }
 
-function Donut({tasks,T}){
-  const size=150,r=56,cx=75,cy=75,inner=33;
-  const total=tasks.reduce((s,t)=>s+t.hours,0);
-  const unalloc=Math.max(0,TOTAL-total);
-  const all=[...tasks,...(unalloc>0.001?[{id:"free",hours:unalloc,color:T.donutFree}]:[])];
-  let a=-Math.PI/2;
-  return(
-    <svg width={size} height={size} style={{display:"block",flexShrink:0}}>
-      {all.map((t,i)=>{
-        const sw=(t.hours/TOTAL)*2*Math.PI;
-        if(sw<0.002)return null;
-        const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a);a+=sw;
-        const x2=cx+r*Math.cos(a),y2=cy+r*Math.sin(a);
-        const d=`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
-        return <path key={t.id||i} d={d} fill={t.color} stroke={T.bg} strokeWidth={2}/>;
-      })}
-      <circle cx={cx} cy={cy} r={inner} fill={T.bg}/>
-      <text x={cx} y={cy-5} textAnchor="middle" fill={T.text} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(total)}</text>
-      <text x={cx} y={cy+11} textAnchor="middle" fill={T.textMuted} fontSize={9} fontFamily="'Space Mono',monospace">of 24h</text>
-    </svg>
-  );
-}
-
-function Timeline({tasks,T}){
+function Timeline({tasks,T,dayLen,dayStart}){
   const rows=tasks.filter(t=>t.hours>0.02);
   let cursor=0;
   const segs=rows.map(t=>{const s=cursor;cursor+=t.hours;return{...t,start:s};});
+  const ticks=[0,0.25,0.5,0.75,1].map(f=>Math.round((dayStart+f*dayLen)*2)/2);
   return(
     <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 10px",marginBottom:16}}>
       <div style={{position:"relative",height:36,borderRadius:6,overflow:"hidden",background:T.bgSlider,marginBottom:6}}>
         {segs.map(s=>{
-          const left=(s.start/TOTAL)*100,width=(s.hours/TOTAL)*100;
+          const left=(s.start/dayLen)*100,width=(s.hours/dayLen)*100;
           return(
             <div key={s.id} style={{position:"absolute",left:`${left}%`,width:`${width}%`,top:0,bottom:0,background:s.color,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",minWidth:2}}>
-              {width>7&&<span style={{fontSize:9,color:"rgba(0,0,0,0.65)",fontFamily:"'Space Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",padding:"0 4px",fontWeight:"bold"}}>{s.name}</span>}
+              {width>7&&<span style={{fontSize:9,color:"rgba(0,0,0,0.65)",fontFamily:"'Space Mono',monospace",whiteSpace:"nowrap",padding:"0 4px",fontWeight:"bold"}}>{s.name}</span>}
             </div>
           );
         })}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
-        {[0,6,12,18,24].map(h=><span key={h}>{h}h</span>)}
+        {ticks.map((h,i)=><span key={i}>{h}:00</span>)}
       </div>
     </div>
   );
@@ -306,7 +515,6 @@ function ThemeToggle({dark,onToggle,T}){
     </button>
   );
 }
-
 function CtrlBtn({label,onClick,dark}){
   return(
     <button onClick={onClick} style={{background:dark?"#0e0e10":"#d0cec8",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"9px 14px",minHeight:40,color:dark?"#cccccc":"#2a2a2a",fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:0.5,flex:1,transition:"opacity 0.1s"}}
@@ -315,7 +523,6 @@ function CtrlBtn({label,onClick,dark}){
     >{label}</button>
   );
 }
-
 function FileBtn({label,onClick,danger,dark}){
   return(
     <button onClick={onClick} style={{background:danger?(dark?"#3a0a0a":"#e8c0c0"):(dark?"#0e0e10":"#d0cec8"),border:`1px solid ${danger?"#ff5555":(dark?"#505055":"#a8a6a0")}`,borderRadius:10,padding:"12px 10px",minHeight:48,color:danger?"#ff7777":(dark?"#cccccc":"#2a2a2a"),fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:0.5,width:"100%",transition:"opacity 0.1s"}}
@@ -339,13 +546,11 @@ function App(){
   const [confirmReset, setConfirmReset]=useState(false);
   const fileRef=useRef(),inputRef=useRef();
 
-  const {tasks,favs,step,dark,showAct,showTL}=state;
+  const {tasks,favs,step,dark,showAct,showTL,dayStart,dayEnd}=state;
+  const dayLen=dayEnd-dayStart;
   const T=dark?DARK:LIGHT;
 
-  // Persist to localStorage whenever state changes
-  useEffect(()=>{ writeStorage(state); },[state]);
-
-  // Theme CSS vars + body bg
+  useEffect(()=>{ wrs(state); },[state]);
   useEffect(()=>{
     document.documentElement.style.setProperty("--bg-slider",T.bgSlider);
     document.documentElement.style.setProperty("--border-mid",T.borderMid);
@@ -354,9 +559,8 @@ function App(){
   },[dark]);
 
   const total=tasks.reduce((s,t)=>s+t.hours,0);
-  const remaining=TOTAL-total;
+  const remaining=dayLen-total;
   const over=remaining<-0.001,perfect=Math.abs(remaining)<0.001;
-
   const toast2=(msg,type="ok")=>{setToast({msg,type});setTimeout(()=>setToast(null),2500);};
 
   const addTask=(nameArg,colorArg,hoursArg)=>{
@@ -369,7 +573,7 @@ function App(){
   };
 
   const exportMD=()=>{
-    const blob=new Blob([serializeMD(tasks)],{type:"text/markdown"});
+    const blob=new Blob([serializeMD(tasks,dayStart,dayEnd)],{type:"text/markdown"});
     const url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download="sliders.md";a.click();URL.revokeObjectURL(url);
     toast2("sliders.md exported!");
@@ -412,7 +616,7 @@ function App(){
               <ThemeToggle dark={dark} onToggle={()=>dispatch({type:"SET_DARK",dark:!dark})} T={T}/>
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub}}>
-                  {perfect?"24h ✓":hm(Math.abs(remaining))}
+                  {perfect?`${hm(dayLen)} ✓`:hm(Math.abs(remaining))}
                 </div>
                 <div style={{fontSize:9,color:T.textDim,letterSpacing:1}}>{over?"OVER BY":perfect?"FULLY ALLOCATED":"REMAINING"}</div>
               </div>
@@ -424,30 +628,49 @@ function App(){
 
       <div style={{padding:"0 16px"}}>
 
-        {/* DONUT */}
-        <div style={{display:"flex",alignItems:"center",gap:16,margin:"16px 0",padding:16,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12}}>
-          <Donut tasks={tasks} T={T}/>
-          <div style={{flex:1,overflow:"hidden",minWidth:0}}>
-            {tasks.map(t=>(
-              <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                <div style={{width:9,height:9,borderRadius:2,background:t.color,flexShrink:0}}/>
-                <span style={{fontSize:11,color:T.textSub,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
-                <span style={{fontSize:11,color:t.color,flexShrink:0,fontWeight:"bold"}}>{((t.hours/TOTAL)*100).toFixed(0)}%</span>
+        {/* DONUT + CIRCULAR SLIDER */}
+        <div style={{margin:"16px 0",padding:16,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            {/* Circular slider with donut inside */}
+            <div style={{position:"relative",width:200,height:200,flexShrink:0}}>
+              <CircularDaySlider
+                dayStart={dayStart} dayEnd={dayEnd} T={T}
+                onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}
+              />
+              <Donut tasks={tasks} T={T} dayLen={dayLen}/>
+            </div>
+
+            {/* Legend */}
+            <div style={{flex:1,overflow:"hidden",minWidth:0}}>
+              {tasks.map(t=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                  <div style={{width:9,height:9,borderRadius:2,background:t.color,flexShrink:0}}/>
+                  <span style={{fontSize:11,color:T.textSub,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+                  <span style={{fontSize:11,color:t.color,flexShrink:0,fontWeight:"bold"}}>{((t.hours/dayLen)*100).toFixed(0)}%</span>
+                </div>
+              ))}
+              {remaining>0.001&&(
+                <div style={{display:"flex",alignItems:"center",gap:7}}>
+                  <div style={{width:9,height:9,borderRadius:2,background:T.donutFree,border:`1px solid ${T.borderMid}`,flexShrink:0}}/>
+                  <span style={{fontSize:11,color:T.textMuted,flex:1}}>Unallocated</span>
+                  <span style={{fontSize:11,color:T.textMuted}}>{hm(remaining)}</span>
+                </div>
+              )}
+              {tasks.length===0&&<span style={{fontSize:11,color:T.textFaint}}>No tasks yet</span>}
+              {/* Day window info */}
+              <div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${T.border}`}}>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1,marginBottom:2}}>DAY WINDOW</div>
+                <div style={{fontSize:11,color:T.textSub,fontFamily:"'Space Mono',monospace"}}>
+                  {`${String(Math.floor(dayStart)).padStart(2,'0')}:${dayStart%1?'30':'00'}`} → {`${String(Math.floor(dayEnd)).padStart(2,'0')}:${dayEnd%1?'30':'00'}`}
+                </div>
+                <div style={{fontSize:10,color:"#FF6B2B",fontFamily:"'Space Mono',monospace",fontWeight:"bold"}}>{hm(dayLen)}</div>
               </div>
-            ))}
-            {remaining>0.001&&(
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <div style={{width:9,height:9,borderRadius:2,background:T.donutFree,border:`1px solid ${T.borderMid}`,flexShrink:0}}/>
-                <span style={{fontSize:11,color:T.textMuted,flex:1}}>Unallocated</span>
-                <span style={{fontSize:11,color:T.textMuted}}>{hm(remaining)}</span>
-              </div>
-            )}
-            {tasks.length===0&&<span style={{fontSize:11,color:T.textFaint}}>No tasks yet</span>}
+            </div>
           </div>
         </div>
 
         {/* TIMELINE */}
-        {showTL&&<Timeline tasks={tasks} T={T}/>}
+        {showTL&&<Timeline tasks={tasks} T={T} dayLen={dayLen} dayStart={dayStart}/>}
 
         {/* CONTROLS */}
         <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
@@ -490,7 +713,7 @@ function App(){
                       </span>
                       {!pending&&<span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:f.color,opacity:0.8}}>{hm(f.hours)}</span>}
                     </button>
-                    <button onClick={()=>pending?dispatch({type:"DEL_FAV",name:f.name})||setConfirmRm(null):setConfirmRm(f.name)}
+                    <button onClick={()=>pending?(dispatch({type:"DEL_FAV",name:f.name}),setConfirmRm(null)):setConfirmRm(f.name)}
                       style={{background:pending?"#ff444430":"none",border:"none",borderLeft:`1px solid ${pending?"#ff5555":T.border}`,padding:"8px 10px",color:pending?"#ff5555":T.textDim,fontSize:11,cursor:"pointer",minHeight:40,display:"flex",alignItems:"center",fontFamily:"'Space Mono',monospace",transition:"all 0.15s"}}
                       onMouseEnter={e=>{if(!pending)e.currentTarget.style.color="#ff5555";}}
                       onMouseLeave={e=>{if(!pending)e.currentTarget.style.color=T.textDim;}}
@@ -507,7 +730,7 @@ function App(){
           <SL>TASKS — DRAG TO ALLOCATE</SL>
           {tasks.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:11,color:T.textFaint,letterSpacing:1.5}}>NO TASKS YET — ADD ONE BELOW</div>}
           {tasks.map(t=>(
-            <TaskCard key={t.id} task={t} stepMinutes={step} T={T} showActual={showAct}
+            <TaskCard key={t.id} task={t} stepMinutes={step} dayLen={dayLen} T={T} showActual={showAct}
               onChange={patch=>dispatch({type:"UPD_TASK",id:t.id,patch})}
               onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
               onEdit={()=>setEditTask({...t})}
@@ -592,7 +815,7 @@ function App(){
             {mdView&&(
               <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginBottom:12}}>
                 <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:8}}>LIVE PREVIEW</div>
-                <pre style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textMuted,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{serializeMD(tasks)}</pre>
+                <pre style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textMuted,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{serializeMD(tasks,dayStart,dayEnd)}</pre>
               </div>
             )}
           </div>
@@ -601,9 +824,9 @@ function App(){
         {/* TIPS */}
         <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginBottom:16,marginTop:16}}>
           <div style={{fontSize:11,color:T.textDim,lineHeight:1.9}}>
-            🔒 Lock a task to prevent accidental slider changes<br/>
-            ⇄ Distribute = split time equally across unlocked tasks<br/>
-            ✏️ Tap the name or color dot to edit a task<br/>
+            🕐 Drag the ring handles to set your day window<br/>
+            🔒 Lock a task to keep it during manual slider changes<br/>
+            ⇄ Distribute = split time equally across all tasks<br/>
             💾 Auto-saved · Export .MD to sync across devices
           </div>
         </div>
