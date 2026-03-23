@@ -393,7 +393,7 @@ function Slider({value,max,color,step,locked,onChange}){
   const pct=(value/max)*100;
   return(
     <div ref={ref} onPointerDown={pd} onPointerMove={pm} onPointerUp={pu}
-      style={{position:"relative",height:40,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:"none",overflow:"hidden"}}>
+      style={{position:"relative",height:40,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:locked?"pan-y":"none",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
       <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${color}66,${color})`,borderRadius:8}}/>
       {[0.25,0.5,0.75].map((f,i)=><div key={i} style={{position:"absolute",left:`${f*100}%`,top:"15%",bottom:"15%",width:1,background:"var(--border-mid)",opacity:0.5}}/>)}
@@ -426,9 +426,9 @@ function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onF
         <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
         <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:task.color,fontWeight:"bold",flexShrink:0}}>{hm(task.hours)}</span>
         <div style={{display:"flex",gap:2,flexShrink:0}}>
-          <Btn44 onClick={onFav} title={isFav?"Remove from favourites":"Add to favourites"}>
-            <span style={{fontSize:14,color:isFav?"#FFB347":"inherit"}}>{isFav?"★":"☆"}</span>
-          </Btn44>
+          {!isFav&&<Btn44 onClick={onFav} title="Add to favourites">
+            <span style={{fontSize:14,color:"inherit"}}>☆</span>
+          </Btn44>}
           <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}>{task.locked?"🔓":"🔒"}</Btn44>
           {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete">✕</Btn44>}
         </div>
