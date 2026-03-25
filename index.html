@@ -564,7 +564,6 @@ function App(){
   const [state,dispatch]=useReducer(reducer,null,initState);
   const [newName,   setNewName]   =useState("");
   const [editTask,  setEditTask]  =useState(null);
-  const [showFile,  setShowFile]  =useState(false);
   const [showImport,setShowImport]=useState(false);
   const [importTxt, setImportTxt] =useState("");
   const [mdView,    setMdView]    =useState(false);
@@ -638,6 +637,8 @@ function App(){
       .catch(()=>setReleases([]))
       .finally(()=>setRelLoading(false));
   };
+
+  const SL=({children})=>(
     <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10,fontFamily:"'Space Mono',monospace"}}>{children}</div>
   );
 
@@ -735,7 +736,9 @@ function App(){
         {/* TIMELINE */}
         {showTL&&<Timeline tasks={tasks} T={T} dayLen={dayLen} dayStart={dayStart}/>}
 
-        {/* SETTINGS BUTTON */}
+        {/* CONTROLS → now inside Settings */}
+
+        {/* SETTINGS + WHAT'S NEW */}
         <div style={{marginBottom:16}}>
           <div style={{display:"flex",gap:8,marginBottom:8}}>
             <button onClick={()=>setShowSettings(v=>!v)}
@@ -752,10 +755,9 @@ function App(){
           {showSettings&&(
             <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 16px",animation:"slideIn 0.15s ease"}}>
 
-              {/* Toggles */}
               {[
-                {label:"Timeline",val:showTL,  action:"SET_SHOW_TL"},
-                {label:"Actual time tracking",val:showAct, action:"SET_SHOW_ACT"},
+                {label:"Timeline",val:showTL,action:"SET_SHOW_TL"},
+                {label:"Actual time tracking",val:showAct,action:"SET_SHOW_ACT"},
                 {label:"Slider tick marks",val:showTicks,action:"SET_SHOW_TICKS"},
               ].map(({label,val,action})=>(
                 <div key={action} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
@@ -767,7 +769,6 @@ function App(){
                 </div>
               ))}
 
-              {/* Distribute */}
               <div style={{padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
                 <button onClick={()=>{dispatch({type:"DISTRIBUTE"});toast2("Distributed evenly ✓");setShowSettings(false);}}
                   style={{width:"100%",background:"none",border:`1px solid ${T.borderMid}`,borderRadius:8,padding:"10px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,cursor:"pointer"}}>
@@ -775,7 +776,6 @@ function App(){
                 </button>
               </div>
 
-              {/* FILE section inside settings */}
               <div style={{padding:"10px 0 4px"}}>
                 <div style={{fontSize:9,color:T.textDim,letterSpacing:2,marginBottom:10,fontFamily:"'Space Mono',monospace"}}>FILE</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
@@ -796,7 +796,7 @@ function App(){
                   <div style={{background:"#1a0000",border:"2px solid #ff2222",borderRadius:10,padding:"16px",marginBottom:4,animation:"slideIn 0.15s ease"}}>
                     <div style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:"#ff4444",marginBottom:14,letterSpacing:0.3,lineHeight:1.6}}>
                       Are you sure you want to reset?<br/>
-                      <span style={{fontSize:10,color:"#cc4444"}}>All tasks, favourites and settings will be wiped. There is no going back.</span>
+                      <span style={{fontSize:10,color:"#cc4444"}}>All tasks, favourites and settings will be wiped.</span>
                     </div>
                     <div style={{display:"flex",gap:8}}>
                       <button onClick={()=>{localStorage.removeItem(KEY);setConfirmReset(false);window.location.reload();}}
@@ -817,7 +817,7 @@ function App(){
                 <div style={{marginBottom:8}}>
                   <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)}
                     placeholder={"Paste sliders.md content here...\n\nFormat:\n## Task name [8.0000h] #FF6B2B"}
-                    style={{width:"100%",height:150,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,color:T.textSub,fontFamily:"'Space Mono',monospace",fontSize:12,lineHeight:1.7,marginBottom:8,resize:"none"}}/>
+                    style={{width:"100%",height:150,background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:14,color:T.textSub,fontFamily:"'Space Mono',monospace",fontSize:12,lineHeight:1.7,marginBottom:8,resize:"none"}}/>
                   <button onClick={pasteImport} style={{width:"100%",background:"#4ECDC420",border:"1px solid #4ECDC4",borderRadius:8,padding:"12px",color:"#4ECDC4",fontFamily:"'Space Mono',monospace",fontSize:11,minHeight:44}}>LOAD</button>
                 </div>
               )}
@@ -830,8 +830,6 @@ function App(){
             </div>
           )}
         </div>
-
-        {/* STEP SIZE */}
         <div style={{marginBottom:18}}>
           <SL>STEP SIZE</SL>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -847,7 +845,7 @@ function App(){
           </div>
         </div>
 
-        {/* STEP SIZE */}
+        {/* FAVOURITES TRAY */}
         {favs.length>0&&(
           <div style={{marginBottom:18}}>
             <SL>FAVOURITES</SL>
@@ -923,7 +921,6 @@ function App(){
         </div>
 
         {/* FOOTER */}
-        {/* maintained by Peter Vincent — https://github.com/vpeter56/Sliders.html */}
         <div style={{textAlign:"center",padding:"8px 0 4px"}}>
           <a href="https://github.com/vpeter56/Sliders.html" target="_blank" rel="noopener noreferrer"
             style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textFaint,textDecoration:"none",letterSpacing:0.5}}>
@@ -940,12 +937,8 @@ function App(){
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:2,color:"#FF6B2B"}}>WHAT'S NEW</span>
               <button onClick={()=>setShowWhatsNew(false)} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             </div>
-            {relLoading&&(
-              <div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint,letterSpacing:1}}>LOADING...</div>
-            )}
-            {!relLoading&&releases&&releases.length===0&&(
-              <div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint,letterSpacing:1}}>No releases found on GitHub.</div>
-            )}
+            {relLoading&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint,letterSpacing:1}}>LOADING...</div>}
+            {!relLoading&&releases&&releases.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint}}>No releases found on GitHub.</div>}
             {!relLoading&&releases&&releases.map((rel,i)=>(
               <div key={rel.id||i} style={{marginBottom:20,paddingBottom:20,borderBottom:i<releases.length-1?`1px solid ${T.border}`:"none"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
@@ -953,19 +946,13 @@ function App(){
                   {i===0&&<span style={{background:"#FF6B2B22",border:"1px solid #FF6B2B",borderRadius:6,padding:"2px 8px",fontFamily:"'Space Mono',monospace",fontSize:9,color:"#FF6B2B",letterSpacing:1}}>LATEST</span>}
                 </div>
                 {rel.name&&rel.name!==rel.tag_name&&<div style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:T.textSub,marginBottom:6}}>{rel.name}</div>}
-                <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textDim,marginBottom:8,letterSpacing:0.5}}>
+                <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textDim,marginBottom:8}}>
                   {rel.published_at?new Date(rel.published_at).toLocaleDateString("en-GB",{year:"numeric",month:"short",day:"numeric"}):""}
                 </div>
-                {rel.body&&(
-                  <div style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textMuted,lineHeight:1.8,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
-                    {rel.body.trim().slice(0,600)}{rel.body.length>600?"…":""}
-                  </div>
-                )}
+                {rel.body&&<div style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textMuted,lineHeight:1.8,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{rel.body.trim().slice(0,600)}{rel.body.length>600?"…":""}</div>}
               </div>
             ))}
-            {!relLoading&&releases===null&&(
-              <div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:"#ff7777"}}>Could not load releases.</div>
-            )}
+            {!relLoading&&releases===null&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:"#ff7777"}}>Could not load releases.</div>}
             <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
           </div>
         </div>
