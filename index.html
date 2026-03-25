@@ -49,7 +49,7 @@ const KEY="sliders_data";
   }catch{}
 })();
 const PALETTE=["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
-const STEPS=[{l:"1m",m:1},{l:"2m",m:2},{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30},{l:"1h",m:60}];
+const STEPS=[{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30}];
 const DARK={bg:"#1c1c1e",bgCard:"#2a2a2e",bgInput:"#323236",bgSlider:"#484850",border:"#505058",borderMid:"#626268",text:"#ffffff",textSub:"#e8e8e8",textMuted:"#c0c0c0",textDim:"#a0a0a0",textFaint:"#888890",donutFree:"#3a3a3e",tc:"#1c1c1e"};
 const LIGHT={bg:"#f4f3ef",bgCard:"#eceae4",bgInput:"#e4e2db",bgSlider:"#d8d6cf",border:"#cac8c1",borderMid:"#bbb9b2",text:"#1a1a1a",textSub:"#2e2e2e",textMuted:"#555",textDim:"#777",textFaint:"#999",donutFree:"#d8d6cf",tc:"#f4f3ef"};
 
@@ -121,11 +121,9 @@ function initState(){
   return {
     tasks:   s?.tasks   ?? DEF_TASKS,
     favs:    s?.favs    ?? [],
-    step:    s?.step    ?? 30,
+    step:    s?.step    ?? 15,
     dark:    s?.dark    ?? true,
-    showAct: s?.showAct ?? false,
     showTL:  s?.showTL  ?? false,
-    showTicks:s?.showTicks?? false,
     dayStart:s?.dayStart?? 0,
     dayEnd:  s?.dayEnd  ?? 24,
   };
@@ -208,11 +206,16 @@ function reducer(state,action){
       return {...state,dayStart:start};
     }
 
+    case 'REORDER_TASKS':{
+      const {from,to}=action;
+      const tasks=[...state.tasks];
+      const [moved]=tasks.splice(from,1);
+      tasks.splice(to,0,moved);
+      return {...state,tasks};
+    }
     case 'SET_STEP':    return {...state,step:action.step};
     case 'SET_DARK':    return {...state,dark:action.dark};
-    case 'SET_SHOW_ACT':return {...state,showAct:action.v};
     case 'SET_SHOW_TL': return {...state,showTL:action.v};
-    case 'SET_SHOW_TICKS':return {...state,showTicks:action.v};
 
     default: return state;
   }
@@ -308,19 +311,9 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
   // Full circle background track
   const fullCircle = `M ${CX} ${CY-R_TRACK} A ${R_TRACK} ${R_TRACK} 0 1 1 ${CX-0.001} ${CY-R_TRACK}`;
 
-  const labelStyle = {
-    position:"absolute", fontFamily:"'Space Mono',monospace",
-    fontSize:11, fontWeight:"bold", color:T.textMuted, lineHeight:1,
-    pointerEvents:"none",
-  };
 
   return (
     <div style={{position:"relative",width:SIZE,height:SIZE,flexShrink:0}}>
-    {/* Clock position labels — outside the ring */}
-    <span style={{...labelStyle, top:-16, left:"50%", transform:"translateX(-50%)"}}>0</span>
-    <span style={{...labelStyle, right:-20, top:"50%", transform:"translateY(-50%)"}}>6</span>
-    <span style={{...labelStyle, bottom:-16, left:"50%", transform:"translateX(-50%)"}}>12</span>
-    <span style={{...labelStyle, left:-20, top:"50%", transform:"translateY(-50%)"}}>6/18</span>
     <svg
       ref={svgRef}
       width={SIZE} height={SIZE}
@@ -334,19 +327,6 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
 
       {/* Active arc */}
       <path d={arcPath(aStart, aEnd)} fill="none" stroke={arcColor} strokeWidth={STROKE} strokeLinecap="round" opacity={0.85}/>
-
-      {/* Hour tick marks at 0,6,12,18 */}
-      {[0,6,12,18].map(h=>{
-        const a=hourToAngle(h);
-        const inner=R_TRACK-STROKE/2-2, outer=R_TRACK+STROKE/2+2;
-        return <line key={h}
-          x1={CX+inner*Math.cos(a)} y1={CY+inner*Math.sin(a)}
-          x2={CX+outer*Math.cos(a)} y2={CY+outer*Math.sin(a)}
-          stroke={T.borderMid} strokeWidth={1.5}
-        />;
-      })}
-
-      {/* Clock labels rendered as HTML outside SVG — see wrapper div */}
 
       {/* Center text */}
       <text x={CX} y={CY-8} textAnchor="middle" fill={textColor} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(dayLen)}</text>
@@ -365,6 +345,16 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
       />
       <text x={tStart.x} y={tStart.y+4} textAnchor="middle" fill="#000" fontSize={7} fontFamily="'Space Mono',monospace" style={{pointerEvents:"none"}}>▶</text>
 
+      {/* Start time label — floats outside the ring near handle */}
+      {(()=>{
+        const labelR = R_TRACK + 22;
+        const lx = CX + labelR * Math.cos(aStart);
+        const ly = CY + labelR * Math.sin(aStart);
+        const anchor = lx < CX - 10 ? "end" : lx > CX + 10 ? "start" : "middle";
+        const startLabel = `${String(Math.floor(dayStart)).padStart(2,'0')}:${dayStart%1?'30':'00'}`;
+        return <text x={lx} y={ly+4} textAnchor={anchor} fill={startColor} fontSize={9} fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>{startLabel}</text>;
+      })()}
+
       {/* End handle (orange) */}
       <circle
         cx={tEnd.x} cy={tEnd.y} r={R_THUMB+4}
@@ -377,6 +367,16 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
         onPointerDown={onPointerDown('end')}
       />
       <text x={tEnd.x} y={tEnd.y+4} textAnchor="middle" fill="#000" fontSize={7} fontFamily="'Space Mono',monospace" style={{pointerEvents:"none"}}>◼</text>
+
+      {/* End time label — floats outside the ring near handle */}
+      {(()=>{
+        const labelR = R_TRACK + 22;
+        const lx = CX + labelR * Math.cos(aEnd);
+        const ly = CY + labelR * Math.sin(aEnd);
+        const anchor = lx < CX - 10 ? "end" : lx > CX + 10 ? "start" : "middle";
+        const endLabel = `${String(Math.floor(dayEnd)).padStart(2,'0')}:${dayEnd%1?'30':'00'}`;
+        return <text x={lx} y={ly+4} textAnchor={anchor} fill={endColor} fontSize={9} fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>{endLabel}</text>;
+      })()}
     </svg>
     </div>
   );
@@ -409,22 +409,31 @@ function Donut({tasks,T,dayLen}){
 // ── Linear Slider ─────────────────────────────────────────────────────────────
 function Slider({value,max,color,step,locked,onChange}){
   const ref=useRef();const drag=useRef(false);
+  const lastSnapped=useRef(value);
   const get=useCallback((cx)=>{
     const r=ref.current.getBoundingClientRect();
     return snap(Math.max(0,Math.min(1,(cx-r.left)/r.width))*max,step);
   },[step,max]);
-  const pd=(e)=>{if(locked)return;e.preventDefault();drag.current=true;ref.current.setPointerCapture(e.pointerId);onChange(get(e.clientX));};
-  const pm=(e)=>{if(drag.current)onChange(get(e.clientX));};
+  const tryHaptic=()=>{try{if(navigator.vibrate)navigator.vibrate(4);}catch{}};
+  const pd=(e)=>{if(locked)return;e.preventDefault();drag.current=true;ref.current.setPointerCapture(e.pointerId);const v=get(e.clientX);onChange(v);lastSnapped.current=v;};
+  const pm=(e)=>{
+    if(!drag.current)return;
+    const v=get(e.clientX);
+    if(v!==lastSnapped.current){tryHaptic();lastSnapped.current=v;}
+    onChange(v);
+  };
   const pu=(e)=>{if(drag.current){drag.current=false;onChange(get(e.clientX));}};
   const pct=(value/max)*100;
   return(
     <div ref={ref} onPointerDown={pd} onPointerMove={pm} onPointerUp={pu}
-      style={{position:"relative",height:40,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:locked?"pan-y":"none",overflow:"hidden"}}>
+      style={{position:"relative",height:36,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:locked?"pan-y":"none",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
-      <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${color}66,${color})`,borderRadius:8}}/>
-      {[0.25,0.5,0.75].map((f,i)=><div key={i} style={{position:"absolute",left:`${f*100}%`,top:"15%",bottom:"15%",width:1,background:"var(--border-mid)",opacity:0.5}}/>)}
-      <div style={{position:"absolute",left:`${pct}%`,top:"50%",transform:"translate(-50%,-50%)",width:20,height:32,background:locked?"#666":color,borderRadius:6,boxShadow:locked?"none":`0 2px 12px ${color}99`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {locked?<span style={{fontSize:10,color:"#fff"}}>🔒</span>:<div style={{width:2,height:12,background:"rgba(0,0,0,0.3)",borderRadius:1}}/>}
+      <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,background:`linear-gradient(90deg,${color}55,${color}cc)`,borderRadius:8,transition:"width 0.04s"}}/>
+      <div style={{position:"absolute",left:`${pct}%`,top:"50%",transform:"translate(-50%,-50%)",width:22,height:28,background:locked?"#555":color,borderRadius:5,boxShadow:locked?"none":`0 2px 10px ${color}88`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",transition:"background 0.2s"}}>
+        {locked
+          ? <span style={{fontSize:9,color:"#fff",opacity:0.7}}>🔒</span>
+          : <div style={{width:2,height:10,background:"rgba(0,0,0,0.25)",borderRadius:1}}/>
+        }
       </div>
     </div>
   );
@@ -441,39 +450,42 @@ function Btn44({onClick,danger,children,title}){
   );
 }
 
-function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onFav,isFav,showActual,showTicks}){
-  const diff=(task.actual||0)-task.hours;
-  const ticks=[0,0.25,0.5,0.75,1].map(f=>hm(f*dayLen));
+function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onFav,isFav,dragHandleProps}){
   const done=!!task.done;
+  const pct=dayLen>0?Math.round((task.hours/dayLen)*100):0;
+  const lastTap=useRef(0);
+  const handleSliderTap=(e)=>{
+    if(e.type==="pointerdown"){
+      const now=Date.now();
+      if(now-lastTap.current<350){onChange({hours:0});e.preventDefault();return;}
+      lastTap.current=now;
+    }
+  };
   return(
-    <div style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,transition:"all 0.25s",opacity:done?0.5:1,filter:done?"grayscale(0.8)":"none"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-        <button onClick={onEdit} style={{width:20,height:20,borderRadius:"50%",background:done?"#555":task.color,border:"none",flexShrink:0,boxShadow:done?"none":`0 0 8px ${task.color}88`,padding:0}}/>
-        <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:done?"line-through":"none"}}>{task.name}</span>
-        <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,color:done?T.textFaint:task.color,fontWeight:"bold",flexShrink:0}}>{hm(task.hours)}</span>
-        <div style={{display:"flex",gap:2,flexShrink:0}}>
-          <Btn44 onClick={()=>onChange({done:!done})} title={done?"Mark undone":"Mark done"}>
-            <span style={{fontSize:14,opacity:done?1:0.4}}>{done?"✅":"☑️"}</span>
+    <div style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"opacity 0.25s,filter 0.25s",opacity:done?0.45:1,filter:done?"grayscale(0.7)":"none"}}>
+      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+        {/* Drag handle */}
+        <div {...dragHandleProps} style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:12,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
+        <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:done?"#555":task.color,border:"none",flexShrink:0,boxShadow:done?"none":`0 0 6px ${task.color}88`,padding:0}}/>
+        <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:done?"line-through":"none"}}>{task.name}</span>
+        <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:done?T.textFaint:task.color,fontWeight:"bold",flexShrink:0}}>{hm(task.hours)}</span>
+        <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,flexShrink:0,opacity:0.7}}>{pct}%</span>
+        <div style={{display:"flex",gap:0,flexShrink:0}}>
+          <Btn44 onClick={()=>onChange({done:!done})} title={done?"Undo":"Done"}>
+            <span style={{fontSize:12,opacity:done?1:0.3}}>{done?"✅":"☑️"}</span>
           </Btn44>
-          {!isFav&&<Btn44 onClick={onFav} title="Add to favourites">
-            <span style={{fontSize:14,color:"inherit"}}>☆</span>
-          </Btn44>}
-          <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}>{task.locked?"🔓":"🔒"}</Btn44>
-          {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete">✕</Btn44>}
+          <Btn44 onClick={onFav} title={isFav?"Unfavourite":"Favourite"}>
+            <span style={{fontSize:12,color:isFav?"#FFB347":"inherit",opacity:isFav?1:0.3}}>★</span>
+          </Btn44>
+          <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}>
+            <span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span>
+          </Btn44>
+          {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
         </div>
       </div>
-      <Slider value={task.hours} max={dayLen} step={stepMinutes} color={done?"#555":task.color} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
-      {showActual&&(
-        <div style={{marginTop:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-            <span style={{fontSize:9,color:T.textDim,letterSpacing:1}}>ACTUAL</span>
-            <span style={{fontSize:10,color:diff>0?"#ff7777":diff<0?"#4ECDC4":T.textDim,fontFamily:"'Space Mono',monospace"}}>
-              {hm(task.actual||0)}{diff!==0?` (${diff>0?"+":""}${hm(Math.abs(diff))})`:""}</span>
-          </div>
-          <Slider value={task.actual||0} max={dayLen} step={stepMinutes} color={diff>0?"#ff7777":"#4ECDC4"} locked={false} onChange={h=>onChange({actual:h})}/>
-        </div>
-      )}
-      {showTicks&&<div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>{ticks.map((l,i)=><span key={i}>{l}</span>)}</div>}
+      <div onPointerDown={handleSliderTap}>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={done?"#555":task.color} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
+      </div>
     </div>
   );
 }
@@ -534,22 +546,15 @@ function Timeline({tasks,T,dayLen,dayStart}){
 
 function ThemeToggle({dark,onToggle,T}){
   return(
-    <button onClick={onToggle} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:`1px solid ${T.border}`,borderRadius:24,padding:"8px 14px",minHeight:44}}>
-      <span style={{fontSize:15}}>{dark?"☀️":"🌙"}</span>
-      <div style={{width:36,height:20,borderRadius:10,background:dark?"#444":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
-        <div style={{position:"absolute",top:3,left:dark?16:3,width:14,height:14,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
+    <button onClick={onToggle} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:`1px solid ${T.border}`,borderRadius:20,padding:"6px 10px",minHeight:36}}>
+      <span style={{fontSize:13}}>{dark?"☀️":"🌙"}</span>
+      <div style={{width:28,height:16,borderRadius:8,background:dark?"#444":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
+        <div style={{position:"absolute",top:2,left:dark?12:2,width:12,height:12,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
       </div>
     </button>
   );
 }
-function CtrlBtn({label,onClick,dark}){
-  return(
-    <button onClick={onClick} style={{background:dark?"#0e0e10":"#d0cec8",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"9px 14px",minHeight:40,color:dark?"#cccccc":"#2a2a2a",fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:0.5,flex:1,transition:"opacity 0.1s"}}
-      onTouchStart={e=>e.currentTarget.style.opacity="0.7"}
-      onTouchEnd={e=>e.currentTarget.style.opacity="1"}
-    >{label}</button>
-  );
-}
+
 function FileBtn({label,onClick,danger,dark}){
   return(
     <button onClick={onClick} style={{background:danger?(dark?"#3a0a0a":"#e8c0c0"):(dark?"#0e0e10":"#d0cec8"),border:`1px solid ${danger?"#ff5555":(dark?"#505055":"#a8a6a0")}`,borderRadius:10,padding:"12px 10px",minHeight:48,color:danger?"#ff7777":(dark?"#cccccc":"#2a2a2a"),fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:0.5,width:"100%",transition:"opacity 0.1s"}}
@@ -564,19 +569,16 @@ function App(){
   const [state,dispatch]=useReducer(reducer,null,initState);
   const [newName,   setNewName]   =useState("");
   const [editTask,  setEditTask]  =useState(null);
-  const [showImport,setShowImport]=useState(false);
-  const [importTxt, setImportTxt] =useState("");
-  const [mdView,    setMdView]    =useState(false);
   const [toast,     setToast]     =useState(null);
   const [confirmRm, setConfirmRm] =useState(null);
   const [confirmReset, setConfirmReset]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
-  const [showWhatsNew,setShowWhatsNew]=useState(false);
-  const [releases,setReleases]=useState(null);
-  const [relLoading,setRelLoading]=useState(false);
+  const [showFavs,setShowFavs]=useState(false);
+  const [dragIdx,setDragIdx]=useState(null);
+  const [dragOver,setDragOver]=useState(null);
   const fileRef=useRef(),inputRef=useRef();
 
-  const {tasks,favs,step,dark,showAct,showTL,showTicks,dayStart,dayEnd}=state;
+  const {tasks,favs,step,dark,showTL,dayStart,dayEnd}=state;
   const dayLen=dayEnd-dayStart;
   const T=dark?DARK:LIGHT;
 
@@ -606,7 +608,7 @@ function App(){
     const blob=new Blob([serializeMD(tasks,dayStart,dayEnd)],{type:"text/markdown"});
     const url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download="sliders.md";a.click();URL.revokeObjectURL(url);
-    toast2("sliders.md exported!");
+    toast2("Exported ✓");
   };
   const handleFile=(e)=>{
     const f=e.target.files[0];if(!f)return;
@@ -619,62 +621,43 @@ function App(){
     };
     reader.readAsText(f);e.target.value="";
   };
-  const pasteImport=()=>{
-    const p=parseMD(importTxt);
-    if(!p.length){toast2("No tasks found","err");return;}
-    dispatch({type:"SET_TASKS",tasks:p});
-    setShowImport(false);setImportTxt("");
-    toast2(`${p.length} tasks loaded`);
-  };
-
-  const openWhatsNew=()=>{
-    setShowWhatsNew(true);
-    if(releases!==null) return;
-    setRelLoading(true);
-    fetch("https://api.github.com/repos/vpeter56/Sliders.html/releases")
-      .then(r=>r.ok?r.json():Promise.reject())
-      .then(data=>setReleases(data.slice(0,5)))
-      .catch(()=>setReleases([]))
-      .finally(()=>setRelLoading(false));
-  };
-
-  const SL=({children})=>(
-    <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:10,fontFamily:"'Space Mono',monospace"}}>{children}</div>
-  );
 
   return(
     <div className="main-wrap" style={{minHeight:"100dvh",background:T.bg,color:T.text,fontFamily:"'Space Mono',monospace",maxWidth:520,margin:"0 auto",paddingBottom:100,transition:"background 0.25s,color 0.25s"}}>
 
       {/* HEADER */}
       <div style={{background:T.bg,position:"sticky",top:0,zIndex:20,transition:"background 0.25s"}}>
-        <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{padding:"14px 16px 12px",borderBottom:`1px solid ${T.border}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:3,color:"#FF6B2B",lineHeight:1}}>SLIDERS</h1>
-              <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginTop:2}}>TIME ALLOCATOR · AUTO-SAVED</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+              <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:36,letterSpacing:3,color:"#FF6B2B",lineHeight:1}}>SLIDERS</h1>
+              <span style={{fontFamily:"'Space Mono',monospace",fontSize:8,color:T.textFaint,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:4,padding:"2px 5px",letterSpacing:1}}>{step}m</span>
             </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-              <ThemeToggle dark={dark} onToggle={()=>dispatch({type:"SET_DARK",dark:!dark})} T={T}/>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{textAlign:"right"}}>
-                <div style={{fontSize:28,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub}}>
+                <div style={{fontSize:26,fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub}}>
                   {perfect?`${hm(dayLen)} ✓`:hm(Math.abs(remaining))}
                 </div>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1}}>{over?"OVER BY":perfect?"FULLY ALLOCATED":"REMAINING"}</div>
+                <div style={{fontSize:8,color:T.textFaint,letterSpacing:1}}>{over?"OVER BY":perfect?"ALLOCATED":"REMAINING"}</div>
               </div>
+              <ThemeToggle dark={dark} onToggle={()=>dispatch({type:"SET_DARK",dark:!dark})} T={T}/>
             </div>
           </div>
-          {over&&<div style={{marginTop:10,padding:"8px 12px",background:"#ff444412",border:"1px solid #ff444430",borderRadius:8,fontSize:11,color:"#ff7777"}}>⚠ Over by {hm(Math.abs(remaining))}</div>}
+          {over&&<div style={{marginTop:8,padding:"6px 10px",background:"#ff444412",border:"1px solid #ff444430",borderRadius:8,fontSize:10,color:"#ff7777"}}>⚠ Over by {hm(Math.abs(remaining))}</div>}
+        </div>
+        {/* Allocation progress bar */}
+        <div style={{height:2,background:T.bgSlider,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${Math.min(100,(total/dayLen)*100)}%`,background:over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B",transition:"width 0.2s,background 0.2s",borderRadius:"0 2px 2px 0"}}/>
         </div>
       </div>
 
       <div style={{padding:"0 16px"}}>
 
         {/* DONUT + CIRCULAR SLIDER */}
-        <div style={{margin:"16px 0",padding:16,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12}}>
-          {/* Top row: circle + legend */}
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{margin:"12px 0",padding:"16px 16px 12px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
             {/* Circular slider with donut inside */}
-            <div style={{position:"relative",width:220,height:220,flexShrink:0,margin:"18px 22px"}}>
+            <div style={{position:"relative",width:220,height:220,flexShrink:0,margin:"14px 16px"}}>
               <CircularDaySlider
                 dayStart={dayStart} dayEnd={dayEnd} T={T}
                 onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}
@@ -682,281 +665,232 @@ function App(){
               <Donut tasks={tasks} T={T} dayLen={dayLen}/>
             </div>
 
-            {/* Legend */}
-            <div style={{flex:1,overflow:"hidden",minWidth:0}}>
+            {/* Legend + start now */}
+            <div style={{flex:1,overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:0}}>
               {tasks.map(t=>(
-                <div key={t.id} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6,opacity:t.done?0.4:1,transition:"opacity 0.2s"}}>
-                  <div style={{width:9,height:9,borderRadius:2,background:t.done?"#555":t.color,flexShrink:0}}/>
-                  <span style={{fontSize:11,color:t.done?T.textFaint:T.textSub,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none"}}>{t.name}</span>
-                  <span style={{fontSize:11,color:t.done?T.textFaint:t.color,flexShrink:0,fontWeight:"bold"}}>{hm(t.hours)}</span>
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,opacity:t.done?0.4:1,transition:"opacity 0.2s"}}>
+                  <div style={{width:7,height:7,borderRadius:2,background:t.done?"#555":t.color,flexShrink:0}}/>
+                  <span style={{fontSize:10,color:t.done?T.textFaint:T.textSub,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none"}}>{t.name}</span>
+                  <span style={{fontSize:10,color:t.done?T.textFaint:t.color,flexShrink:0,fontWeight:"bold"}}>{hm(t.hours)}</span>
                 </div>
               ))}
               {remaining>0.001&&(
-                <div style={{display:"flex",alignItems:"center",gap:7}}>
-                  <div style={{width:9,height:9,borderRadius:2,background:T.donutFree,border:`1px solid ${T.borderMid}`,flexShrink:0}}/>
-                  <span style={{fontSize:11,color:T.textMuted,flex:1}}>Unallocated</span>
-                  <span style={{fontSize:11,color:T.textMuted}}>{hm(remaining)}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                  <div style={{width:7,height:7,borderRadius:2,background:T.donutFree,border:`1px solid ${T.borderMid}`,flexShrink:0}}/>
+                  <span style={{fontSize:10,color:T.textMuted,flex:1}}>Free</span>
+                  <span style={{fontSize:10,color:T.textMuted}}>{hm(remaining)}</span>
                 </div>
               )}
-              {tasks.length===0&&<span style={{fontSize:11,color:T.textFaint}}>No tasks yet</span>}
+              {tasks.length===0&&<span style={{fontSize:10,color:T.textFaint}}>No tasks yet</span>}
+              <button
+                onClick={()=>{
+                  const now=new Date();
+                  const totalMins=now.getHours()*60+now.getMinutes();
+                  const snapped=Math.ceil(totalMins/step)*step;
+                  const h=Math.min(snapped/60, 23.5);
+                  dispatch({type:"SET_DAY_START",start:h});
+                  toast2("Start → now ✓");
+                }}
+                style={{marginTop:10,background:"none",border:`1px solid ${T.borderMid}`,borderRadius:8,padding:"7px 10px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all 0.15s",letterSpacing:0.5}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
+                onTouchStart={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
+                onTouchEnd={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
+              ><span>⏱</span> start now</button>
             </div>
-          </div>
-
-          {/* Bottom row: day window info + set start button */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:`1px solid ${T.border}`,gap:12}}>
-            <div>
-              <div style={{fontSize:9,color:T.textDim,letterSpacing:1,marginBottom:3}}>DAY WINDOW</div>
-              <div style={{fontSize:12,color:T.textSub,fontFamily:"'Space Mono',monospace"}}>
-                {`${String(Math.floor(dayStart)).padStart(2,'0')}:${dayStart%1?'30':'00'}`}
-                <span style={{color:T.textFaint}}> → </span>
-                {`${String(Math.floor(dayEnd)).padStart(2,'0')}:${dayEnd%1?'30':'00'}`}
-                <span style={{color:"#FF6B2B",marginLeft:8,fontSize:11}}>{hm(dayLen)}</span>
-              </div>
-            </div>
-            <button
-              onClick={()=>{
-                const now=new Date();
-                const totalMins=now.getHours()*60+now.getMinutes();
-                const stepMins=step;
-                // Round UP to next step boundary
-                const snapped=Math.ceil(totalMins/stepMins)*stepMins;
-                const h=Math.min(snapped/60, 23.5);
-                dispatch({type:"SET_DAY_START",start:h});
-                toast2("Start → now ✓");
-              }}
-              style={{flexShrink:0,background:"none",border:`1px solid ${T.borderMid}`,borderRadius:10,padding:"8px 14px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
-              onTouchStart={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
-              onTouchEnd={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
-            ><span style={{fontSize:13}}>⏱</span> start now</button>
           </div>
         </div>
 
         {/* TIMELINE */}
         {showTL&&<Timeline tasks={tasks} T={T} dayLen={dayLen} dayStart={dayStart}/>}
 
-        {/* CONTROLS → now inside Settings */}
-
-        {/* SETTINGS + WHAT'S NEW */}
-        <div style={{marginBottom:16}}>
-          <div style={{display:"flex",gap:8,marginBottom:8}}>
+        {/* SETTINGS */}
+        <div style={{marginBottom:10}}>
+          <div style={{marginBottom:6}}>
             <button onClick={()=>setShowSettings(v=>!v)}
-              style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 16px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+              style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"9px 14px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
               <span>⚙ SETTINGS</span>
-              <span style={{fontSize:12}}>{showSettings?"▲":"▼"}</span>
-            </button>
-            <button onClick={openWhatsNew}
-              style={{flexShrink:0,background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 14px",color:"#FF6B2B",fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,cursor:"pointer",whiteSpace:"nowrap"}}>
-              ✦ WHAT'S NEW
+              <span style={{fontSize:11}}>{showSettings?"▲":"▼"}</span>
             </button>
           </div>
 
           {showSettings&&(
             <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 16px",animation:"slideIn 0.15s ease"}}>
 
-              {[
-                {label:"Timeline",val:showTL,action:"SET_SHOW_TL"},
-                {label:"Actual time tracking",val:showAct,action:"SET_SHOW_ACT"},
-                {label:"Slider tick marks",val:showTicks,action:"SET_SHOW_TICKS"},
-              ].map(({label,val,action})=>(
-                <div key={action} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
-                  <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textSub}}>{label}</span>
-                  <button onClick={()=>dispatch({type:action,v:!val})}
-                    style={{width:44,height:24,borderRadius:12,background:val?"#FF6B2B":"#484850",border:"none",position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                    <div style={{position:"absolute",top:3,left:val?22:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
-                  </button>
-                </div>
-              ))}
-
-              <div style={{padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
-                <button onClick={()=>{dispatch({type:"DISTRIBUTE"});toast2("Distributed evenly ✓");setShowSettings(false);}}
-                  style={{width:"100%",background:"none",border:`1px solid ${T.borderMid}`,borderRadius:8,padding:"10px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,cursor:"pointer"}}>
-                  ⇄ DISTRIBUTE EVENLY
+              {/* Timeline toggle only */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
+                <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textSub}}>Timeline view</span>
+                <button onClick={()=>dispatch({type:"SET_SHOW_TL",v:!showTL})}
+                  style={{width:44,height:24,borderRadius:12,background:showTL?"#FF6B2B":"#484850",border:"none",position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                  <div style={{position:"absolute",top:3,left:showTL?22:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
                 </button>
               </div>
 
-              <div style={{padding:"10px 0 4px"}}>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:2,marginBottom:10,fontFamily:"'Space Mono',monospace"}}>FILE</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              {/* SNAP SIZE */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:"'Space Mono',monospace"}}>SNAP SIZE</div>
+                <div style={{display:"flex",gap:6}}>
+                  {STEPS.map(s=>{
+                    const active=s.m===step;
+                    return(
+                      <button key={s.m} onClick={()=>dispatch({type:"SET_STEP",step:s.m})}
+                        style={{flex:1,background:active?"#FF6B2B":T.bgInput,border:`1px solid ${active?"#FF6B2B":T.border}`,borderRadius:8,padding:"8px 0",color:active?"#000":T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:11,fontWeight:active?"bold":"normal",transition:"all 0.15s"}}>
+                        {s.l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* FILE — export/import only */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:"'Space Mono',monospace"}}>FILE</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   <FileBtn label="⬇ EXPORT .MD" onClick={exportMD} dark={dark}/>
                   <FileBtn label="⬆ IMPORT .MD" onClick={()=>fileRef.current.click()} dark={dark}/>
-                  <FileBtn label="✎ PASTE MD" onClick={()=>setShowImport(v=>!v)} dark={dark}/>
-                  <FileBtn label={mdView?"◀ HIDE MD":"▶ VIEW MD"} onClick={()=>setMdView(v=>!v)} dark={dark}/>
-                  <div style={{gridColumn:"1/-1"}}>
-                    <FileBtn label="✕ CLEAR ALL TASKS" onClick={()=>{dispatch({type:"SET_TASKS",tasks:[]});toast2("All tasks cleared");}} danger dark={dark}/>
-                  </div>
                 </div>
+              </div>
 
+              <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
+
+              {/* DANGER ZONE */}
+              <div>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:"'Space Mono',monospace"}}>DANGER</div>
                 {!confirmReset?(
-                  <button onClick={()=>setConfirmReset(true)} style={{width:"100%",background:"#cc0000",border:"2px solid #ff2222",borderRadius:10,padding:"13px",color:"#ffffff",fontFamily:"'Space Mono',monospace",fontSize:11,fontWeight:"bold",letterSpacing:1,marginBottom:4,minHeight:48}}>
+                  <button onClick={()=>setConfirmReset(true)} style={{width:"100%",background:"none",border:"1px solid #cc3333",borderRadius:10,padding:"10px",color:"#cc3333",fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,cursor:"pointer"}}>
                     ⚠ RESET APP
                   </button>
                 ):(
-                  <div style={{background:"#1a0000",border:"2px solid #ff2222",borderRadius:10,padding:"16px",marginBottom:4,animation:"slideIn 0.15s ease"}}>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:"#ff4444",marginBottom:14,letterSpacing:0.3,lineHeight:1.6}}>
-                      Are you sure you want to reset?<br/>
-                      <span style={{fontSize:10,color:"#cc4444"}}>All tasks, favourites and settings will be wiped.</span>
+                  <div style={{background:"#1a0000",border:"1px solid #ff2222",borderRadius:10,padding:"14px",animation:"slideIn 0.15s ease"}}>
+                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:"#ff4444",marginBottom:12,lineHeight:1.6}}>
+                      Reset everything?<br/>
+                      <span style={{fontSize:9,color:"#cc4444",opacity:0.8}}>Tasks, favourites and settings will be wiped.</span>
                     </div>
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>{localStorage.removeItem(KEY);setConfirmReset(false);window.location.reload();}}
-                        style={{flex:1,background:"#cc0000",border:"2px solid #ff2222",borderRadius:8,padding:"12px",color:"#fff",fontFamily:"'Space Mono',monospace",fontSize:12,fontWeight:"bold",minHeight:48}}>
-                        YES, RESET
+                      <button onClick={()=>{localStorage.removeItem(KEY);window.location.reload();}}
+                        style={{flex:1,background:"#cc0000",border:"none",borderRadius:8,padding:"10px",color:"#fff",fontFamily:"'Space Mono',monospace",fontSize:11,fontWeight:"bold",minHeight:44}}>
+                        YES
                       </button>
                       <button onClick={()=>setConfirmReset(false)}
-                        style={{flex:1,background:"none",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"12px",color:dark?"#cccccc":"#2a2a2a",fontFamily:"'Space Mono',monospace",fontSize:12,minHeight:48}}>
-                        NO, CANCEL
+                        style={{flex:1,background:"none",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"10px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:11,minHeight:44}}>
+                        CANCEL
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-
-              <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
-              {showImport&&(
-                <div style={{marginBottom:8}}>
-                  <textarea value={importTxt} onChange={e=>setImportTxt(e.target.value)}
-                    placeholder={"Paste sliders.md content here...\n\nFormat:\n## Task name [8.0000h] #FF6B2B"}
-                    style={{width:"100%",height:150,background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:14,color:T.textSub,fontFamily:"'Space Mono',monospace",fontSize:12,lineHeight:1.7,marginBottom:8,resize:"none"}}/>
-                  <button onClick={pasteImport} style={{width:"100%",background:"#4ECDC420",border:"1px solid #4ECDC4",borderRadius:8,padding:"12px",color:"#4ECDC4",fontFamily:"'Space Mono',monospace",fontSize:11,minHeight:44}}>LOAD</button>
-                </div>
-              )}
-              {mdView&&(
-                <div style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginTop:8}}>
-                  <div style={{fontSize:10,color:T.textDim,letterSpacing:2,marginBottom:8}}>LIVE PREVIEW</div>
-                  <pre style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textMuted,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{serializeMD(tasks,dayStart,dayEnd)}</pre>
-                </div>
-              )}
             </div>
           )}
         </div>
-        <div style={{marginBottom:18}}>
-          <SL>STEP SIZE</SL>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {STEPS.map(s=>{
-              const active=s.m===step;
-              return(
-                <button key={s.m} onClick={()=>dispatch({type:"SET_STEP",step:s.m})}
-                  style={{background:active?(dark?"#5a5a62":"#b8b6b0"):T.bgCard,border:`1px solid ${active?(dark?"#7a7a82":"#8a8880"):T.border}`,borderRadius:8,padding:"9px 14px",minHeight:44,color:active?(dark?"#ffffff":"#111111"):T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:11,fontWeight:active?"bold":"normal"}}>
-                  {s.l}
-                </button>
-              );
-            })}
-          </div>
+        {/* FAVOURITES DROPDOWN */}
+        <div style={{marginBottom:12}}>
+          <button
+            onClick={()=>setShowFavs(v=>!v)}
+            style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 16px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:showFavs?8:0,transition:"margin 0.15s"}}
+          >
+            <span>★ FAVOURITES{favs.length>0?` (${favs.length})`:""}</span>
+            <span style={{fontSize:12}}>{showFavs?"▲":"▼"}</span>
+          </button>
+          {showFavs&&(
+            <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",animation:"slideIn 0.15s ease"}}>
+              {favs.length===0&&(
+                <div style={{textAlign:"center",padding:"16px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint,letterSpacing:1}}>NO FAVOURITES YET — STAR A TASK</div>
+              )}
+              <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                {favs.map(f=>{
+                  const active=tasks.some(t=>t.name.toLowerCase()===f.name.toLowerCase());
+                  const pending=confirmRm===f.name;
+                  return(
+                    <div key={f.name} style={{display:"flex",alignItems:"center",borderRadius:10,overflow:"hidden",border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`,opacity:active?0.45:1,transition:"all 0.15s"}}>
+                      <button onClick={()=>{if(pending){setConfirmRm(null);return;}if(!active)addTask(f.name,f.color,f.hours);}}
+                        style={{background:pending?"#3a0a0a":active?T.bgCard:`${f.color}22`,border:"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:7,cursor:active&&!pending?"default":"pointer",minHeight:40}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:pending?"#ff5555":f.color,flexShrink:0}}/>
+                        <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:pending?"#ff7777":active?T.textFaint:T.text,whiteSpace:"nowrap"}}>
+                          {pending?"tap to cancel":f.name}
+                        </span>
+                        {!pending&&<span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:f.color,opacity:0.8}}>{hm(f.hours)}</span>}
+                      </button>
+                      <button onClick={()=>pending?(dispatch({type:"DEL_FAV",name:f.name}),setConfirmRm(null)):setConfirmRm(f.name)}
+                        style={{background:pending?"#ff444430":"none",border:"none",borderLeft:`1px solid ${pending?"#ff5555":T.border}`,padding:"8px 10px",color:pending?"#ff5555":T.textDim,fontSize:11,cursor:"pointer",minHeight:40,display:"flex",alignItems:"center",fontFamily:"'Space Mono',monospace",transition:"all 0.15s"}}
+                        onMouseEnter={e=>{if(!pending)e.currentTarget.style.color="#ff5555";}}
+                        onMouseLeave={e=>{if(!pending)e.currentTarget.style.color=T.textDim;}}
+                      >{pending?"remove":"✕"}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* FAVOURITES TRAY */}
-        {favs.length>0&&(
-          <div style={{marginBottom:18}}>
-            <SL>FAVOURITES</SL>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-              {favs.map(f=>{
-                const active=tasks.some(t=>t.name.toLowerCase()===f.name.toLowerCase());
-                const pending=confirmRm===f.name;
-                return(
-                  <div key={f.name} style={{display:"flex",alignItems:"center",borderRadius:10,overflow:"hidden",border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`,opacity:active?0.45:1,transition:"all 0.15s"}}>
-                    <button onClick={()=>{if(pending){setConfirmRm(null);return;}if(!active)addTask(f.name,f.color,f.hours);}}
-                      style={{background:pending?"#3a0a0a":active?T.bgCard:`${f.color}22`,border:"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:7,cursor:active&&!pending?"default":"pointer",minHeight:40}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:pending?"#ff5555":f.color,flexShrink:0}}/>
-                      <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:pending?"#ff7777":active?T.textFaint:T.text,whiteSpace:"nowrap"}}>
-                        {pending?"tap to cancel":f.name}
-                      </span>
-                      {!pending&&<span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:f.color,opacity:0.8}}>{hm(f.hours)}</span>}
-                    </button>
-                    <button onClick={()=>pending?(dispatch({type:"DEL_FAV",name:f.name}),setConfirmRm(null)):setConfirmRm(f.name)}
-                      style={{background:pending?"#ff444430":"none",border:"none",borderLeft:`1px solid ${pending?"#ff5555":T.border}`,padding:"8px 10px",color:pending?"#ff5555":T.textDim,fontSize:11,cursor:"pointer",minHeight:40,display:"flex",alignItems:"center",fontFamily:"'Space Mono',monospace",transition:"all 0.15s"}}
-                      onMouseEnter={e=>{if(!pending)e.currentTarget.style.color="#ff5555";}}
-                      onMouseLeave={e=>{if(!pending)e.currentTarget.style.color=T.textDim;}}
-                    >{pending?"remove":"✕"}</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* TASKS */}
-        <div style={{marginBottom:16}}>
-          <SL>TASKS — DRAG TO ALLOCATE</SL>
-          {tasks.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:11,color:T.textFaint,letterSpacing:1.5}}>NO TASKS YET — ADD ONE BELOW</div>}
-          {tasks.map(t=>(
-            <TaskCard key={t.id} task={t} stepMinutes={step} dayLen={dayLen} T={T} showActual={showAct} showTicks={showTicks}
-              onChange={patch=>dispatch({type:"UPD_TASK",id:t.id,patch})}
-              onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
-              onEdit={()=>setEditTask({...t})}
-              onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
-              isFav={favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase())}
-              onFav={()=>{
-                if(favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase()))
-                  dispatch({type:"DEL_FAV",name:t.name});
-                else
-                  dispatch({type:"ADD_FAV",task:t});
-              }}
-            />
-          ))}
+        <div style={{marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,fontFamily:"'Space Mono',monospace"}}>TASKS{tasks.length>0?` · ${tasks.filter(t=>t.done).length}/${tasks.length} done`:""}</div>
+            {tasks.length>1&&<button
+              onClick={()=>{dispatch({type:"DISTRIBUTE"});toast2("Distributed ✓");}}
+              style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"4px 10px",color:T.textMuted,fontFamily:"'Space Mono',monospace",fontSize:9,cursor:"pointer",letterSpacing:0.5,transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
+            >⇄ distribute</button>}
+          </div>
+          {tasks.length===0&&(
+            <div style={{textAlign:"center",padding:"28px 0 20px",borderRadius:12,border:`1px dashed ${T.border}`}}>
+              <div style={{fontSize:24,marginBottom:8}}>📋</div>
+              <div style={{fontSize:11,color:T.textFaint,letterSpacing:1}}>No tasks yet</div>
+              <div style={{fontSize:10,color:T.textFaint,opacity:0.6,marginTop:4}}>Add one below ↓</div>
+            </div>
+          )}
+          {tasks.map((t,i)=>{
+            const isDragging=dragIdx===i;
+            const isOver=dragOver===i&&dragIdx!==i;
+            return(
+              <div key={t.id}
+                style={{opacity:isDragging?0.4:1,transform:isOver?"translateY(-2px)":"none",transition:"opacity 0.15s,transform 0.1s"}}
+                onDragOver={e=>{e.preventDefault();setDragOver(i);}}
+                onDrop={e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i){dispatch({type:"REORDER_TASKS",from:dragIdx,to:i});}setDragIdx(null);setDragOver(null);}}
+                onDragEnd={()=>{setDragIdx(null);setDragOver(null);}}
+              >
+                <TaskCard task={t} stepMinutes={step} dayLen={dayLen} T={T}
+                  onChange={patch=>dispatch({type:"UPD_TASK",id:t.id,patch})}
+                  onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
+                  onEdit={()=>setEditTask({...t})}
+                  onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
+                  isFav={favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase())}
+                  onFav={()=>{
+                    if(favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase()))
+                      dispatch({type:"DEL_FAV",name:t.name});
+                    else dispatch({type:"ADD_FAV",task:t});
+                  }}
+                  dragHandleProps={{
+                    draggable:true,
+                    onDragStart:()=>setDragIdx(i),
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* ADD TASK */}
-        <div style={{display:"flex",gap:10,marginBottom:24}}>
+        <div style={{display:"flex",gap:8,marginBottom:24}}>
           <input ref={inputRef} value={newName}
             onChange={e=>setNewName(e.target.value)}
             onKeyDown={e=>e.key==="Enter"&&addTask()}
-            placeholder="New task name..."
-            style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:"'Space Mono',monospace",fontSize:14,transition:"background 0.2s"}}/>
+            placeholder="Add a task…"
+            style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:"'Space Mono',monospace",fontSize:14,transition:"border-color 0.2s"}}
+            onFocus={e=>e.target.style.borderColor="#FF6B2B"}
+            onBlur={e=>e.target.style.borderColor=T.border}
+          />
           <button onClick={()=>addTask()}
-            style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 20px",color:"#000",fontFamily:"'Space Mono',monospace",fontSize:13,fontWeight:"bold",flexShrink:0,minWidth:80,minHeight:52}}
-            onTouchStart={e=>e.currentTarget.style.opacity="0.8"}
+            style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}}
+            onTouchStart={e=>e.currentTarget.style.opacity="0.75"}
             onTouchEnd={e=>e.currentTarget.style.opacity="1"}
-          >+ ADD</button>
-        </div>
-
-        {/* TIPS */}
-        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:14,marginBottom:16,marginTop:16}}>
-          <div style={{fontSize:11,color:T.textDim,lineHeight:1.9}}>
-            🕐 Drag the ring handles to set your day window<br/>
-            🔒 Lock a task to keep it during manual slider changes<br/>
-            ⇄ Distribute = split time equally across all tasks<br/>
-            💾 Auto-saved · Export .MD to sync across devices
-          </div>
-        </div>
-
-        {/* FOOTER */}
-        <div style={{textAlign:"center",padding:"8px 0 4px"}}>
-          <a href="https://github.com/vpeter56/Sliders.html" target="_blank" rel="noopener noreferrer"
-            style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textFaint,textDecoration:"none",letterSpacing:0.5}}>
-            maintained by Peter Vincent
-          </a>
+            onMouseEnter={e=>e.currentTarget.style.opacity="0.85"}
+            onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+          >ADD</button>
         </div>
       </div>
-
-      {/* WHAT'S NEW MODAL */}
-      {showWhatsNew&&(
-        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)setShowWhatsNew(false);}}>
-          <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24,maxHeight:"80dvh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,letterSpacing:2,color:"#FF6B2B"}}>WHAT'S NEW</span>
-              <button onClick={()=>setShowWhatsNew(false)} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-            </div>
-            {relLoading&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint,letterSpacing:1}}>LOADING...</div>}
-            {!relLoading&&releases&&releases.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textFaint}}>No releases found on GitHub.</div>}
-            {!relLoading&&releases&&releases.map((rel,i)=>(
-              <div key={rel.id||i} style={{marginBottom:20,paddingBottom:20,borderBottom:i<releases.length-1?`1px solid ${T.border}`:"none"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:17,letterSpacing:1.5,color:T.text}}>{rel.tag_name||rel.name}</span>
-                  {i===0&&<span style={{background:"#FF6B2B22",border:"1px solid #FF6B2B",borderRadius:6,padding:"2px 8px",fontFamily:"'Space Mono',monospace",fontSize:9,color:"#FF6B2B",letterSpacing:1}}>LATEST</span>}
-                </div>
-                {rel.name&&rel.name!==rel.tag_name&&<div style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:T.textSub,marginBottom:6}}>{rel.name}</div>}
-                <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:T.textDim,marginBottom:8}}>
-                  {rel.published_at?new Date(rel.published_at).toLocaleDateString("en-GB",{year:"numeric",month:"short",day:"numeric"}):""}
-                </div>
-                {rel.body&&<div style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:T.textMuted,lineHeight:1.8,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{rel.body.trim().slice(0,600)}{rel.body.length>600?"…":""}</div>}
-              </div>
-            ))}
-            {!relLoading&&releases===null&&<div style={{textAlign:"center",padding:"32px 0",fontFamily:"'Space Mono',monospace",fontSize:11,color:"#ff7777"}}>Could not load releases.</div>}
-            <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
-          </div>
-        </div>
-      )}
 
       {/* EDIT MODAL */}
       {editTask&&(
@@ -975,103 +909,8 @@ function App(){
   );
 }
 
-// ── Display Filter Widget ─────────────────────────────────────────────────────
-function DisplayFilter() {
-  const [open, setOpen] = useState(false);
-  const [brightness, setBrightness] = useState(() => {
-    try { return parseFloat(localStorage.getItem("df_brightness") || "1"); } catch { return 1; }
-  });
-  const [contrast, setContrast] = useState(() => {
-    try { return parseFloat(localStorage.getItem("df_contrast") || "1"); } catch { return 1; }
-  });
-
-  useEffect(() => {
-    // Apply filter to <html> element — the only ancestor where CSS filter
-    // does NOT break setPointerCapture on descendant elements.
-    document.documentElement.style.filter = `brightness(${brightness}) contrast(${contrast})`;
-    document.documentElement.style.transition = "filter 0.15s";
-    try {
-      localStorage.setItem("df_brightness", brightness);
-      localStorage.setItem("df_contrast", contrast);
-    } catch {}
-  }, [brightness, contrast]);
-
-  const isDefault = brightness === 1 && contrast === 1;
-
-  const mkSliderBg = (val, min, max) => {
-    const pct = ((val - min) / (max - min)) * 100;
-    return `linear-gradient(90deg, #FF6B2B ${pct}%, #484850 ${pct}%)`;
-  };
-
-  return (
-    <div style={{position:"fixed",bottom:"calc(20px + env(safe-area-inset-bottom,0px))",right:16,zIndex:300,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
-      {open && (
-        <div style={{
-          background:"#222226",border:"1px solid #505058",borderRadius:14,
-          padding:"14px 16px",width:220,boxShadow:"0 8px 32px rgba(0,0,0,0.6)",
-          animation:"slideIn 0.18s ease",backdropFilter:"blur(12px)",
-        }}>
-          <div style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#a0a0a0",letterSpacing:1.5,marginBottom:14}}>DISPLAY FILTER</div>
-
-          <div style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#c0c0c0",letterSpacing:1}}>BRIGHTNESS</span>
-              <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#FF6B2B"}}>{Math.round(brightness * 100)}%</span>
-            </div>
-            <input type="range" min={0.4} max={1.5} step={0.02} value={brightness}
-              onChange={e => setBrightness(parseFloat(e.target.value))}
-              style={{WebkitAppearance:"none",appearance:"none",width:"100%",height:4,borderRadius:2,
-                outline:"none",cursor:"pointer",border:"none",
-                background: mkSliderBg(brightness, 0.4, 1.5)}}
-            />
-          </div>
-
-          <div style={{marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-              <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#c0c0c0",letterSpacing:1}}>CONTRAST</span>
-              <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#FF6B2B"}}>{Math.round(contrast * 100)}%</span>
-            </div>
-            <input type="range" min={0.6} max={1.6} step={0.02} value={contrast}
-              onChange={e => setContrast(parseFloat(e.target.value))}
-              style={{WebkitAppearance:"none",appearance:"none",width:"100%",height:4,borderRadius:2,
-                outline:"none",cursor:"pointer",border:"none",
-                background: mkSliderBg(contrast, 0.6, 1.6)}}
-            />
-          </div>
-
-          {!isDefault && (
-            <button onClick={() => { setBrightness(1); setContrast(1); }}
-              style={{width:"100%",background:"none",border:"1px solid #505058",borderRadius:8,padding:"8px",
-                color:"#888890",fontFamily:"'Space Mono',monospace",fontSize:9,letterSpacing:1,cursor:"pointer"}}>
-              RESET
-            </button>
-          )}
-        </div>
-      )}
-      <button
-        onClick={() => setOpen(v => !v)}
-        title="Display settings"
-        style={{
-          width:40,height:40,borderRadius:"50%",
-          background: open ? "#FF6B2B" : (isDefault ? "#2a2a2e" : "#FF6B2B33"),
-          border: `1px solid ${open ? "#FF6B2B" : (isDefault ? "#505058" : "#FF6B2B")}`,
-          color: open ? "#000" : (isDefault ? "#a0a0a0" : "#FF6B2B"),
-          fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-          boxShadow: open ? "0 4px 16px rgba(255,107,43,0.4)" : "0 2px 8px rgba(0,0,0,0.4)",
-          transition:"all 0.15s",
-        }}
-      >☀</button>
-    </div>
-  );
-}
-
 function Root() {
-  return (
-    <React.Fragment>
-      <App />
-      <DisplayFilter />
-    </React.Fragment>
-  );
+  return <App />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
