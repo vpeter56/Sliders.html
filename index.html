@@ -6,6 +6,9 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#1c1c1e" id="themeColorMeta"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>Sliders</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -37,7 +40,18 @@ input[type="text"],input[type="color"],textarea{font-size:16px!important;}
 const {useState,useRef,useEffect,useCallback,useReducer}=React;
 
 const TOTAL=24;
-const KEY="sliders_v5";
+const KEY="sliders_data"; // stable key — never changes between versions
+// Migrate data from any old versioned key
+(function migrateOldData(){
+  const OLD_KEYS=["sliders_v5","sliders_v4","sliders_v3","sliders_v2","sliders_v1"];
+  try{
+    if(localStorage.getItem(KEY)) return; // already on new key
+    for(const old of OLD_KEYS){
+      const d=localStorage.getItem(old);
+      if(d){ localStorage.setItem(KEY,d); break; }
+    }
+  }catch{}
+})();
 const PALETTE=["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
 const STEPS=[{l:"1m",m:1},{l:"2m",m:2},{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30},{l:"1h",m:60}];
 const DARK={bg:"#1c1c1e",bgCard:"#2a2a2e",bgInput:"#323236",bgSlider:"#484850",border:"#505058",borderMid:"#626268",text:"#ffffff",textSub:"#e8e8e8",textMuted:"#c0c0c0",textDim:"#a0a0a0",textFaint:"#888890",donutFree:"#3a3a3e",tc:"#1c1c1e"};
@@ -1018,7 +1032,7 @@ function Root() {
   );
 }
 
-ReactDOM.render(<Root/>, document.getElementById("root"));
+ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
 </script>
 </body>
 </html>
