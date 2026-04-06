@@ -28,6 +28,7 @@ input[type="text"],input[type="color"],textarea{font-size:16px!important;}
 @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes floatIn{from{opacity:0;transform:rotate(-1.5deg) scale(0.9)}to{opacity:1;transform:rotate(-1.5deg) scale(1.04)}}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn 0.15s ease;backdrop-filter:blur(4px);}
 .modal-sheet{width:100%;max-width:520px;animation:fadeUp 0.22s ease;}
 @media(min-width:600px){.main-wrap{max-width:600px!important;}.modal-overlay{align-items:center;}.modal-sheet{border-radius:16px!important;max-width:460px;}}
@@ -304,6 +305,9 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
   const dayLen = dayEnd - dayStart;
   const textColor = T.text;
   const trackBg = T.bgSlider;
+  // Arc brightness: more hours selected → more vivid orange; less → faded
+  const dayLenRatio = Math.max(0, Math.min(1, dayLen / 24)); // 0..1
+  const arcOpacity = 0.2 + 0.8 * dayLenRatio;
   const arcColor = "#FF6B2B";
   const startColor = "#4ECDC4";
   const endColor = "#FF6B2B";
@@ -326,7 +330,7 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
       <path d={fullCircle} fill="none" stroke={trackBg} strokeWidth={STROKE} strokeLinecap="round"/>
 
       {/* Active arc */}
-      <path d={arcPath(aStart, aEnd)} fill="none" stroke={arcColor} strokeWidth={STROKE} strokeLinecap="round" opacity={0.85}/>
+      <path d={arcPath(aStart, aEnd)} fill="none" stroke={arcColor} strokeWidth={STROKE} strokeLinecap="round" opacity={arcOpacity} style={{transition:"opacity 0.3s"}}/>
 
       {/* Center text */}
       <text x={CX} y={CY-8} textAnchor="middle" fill={textColor} fontSize={13} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(dayLen)}</text>
@@ -382,31 +386,187 @@ function CircularDaySlider({dayStart, dayEnd, T, onChange}) {
   );
 }
 
-// ── DonutChart (inner, inside the ring) ──────────────────────────────────────
-function Donut({tasks,T,dayLen}){
+// ── DonutChart (inner, inside the ring) — with drag-to-reorder ───────────────
+function Donut({tasks,T,dayLen,onReorder}){
   const size=220, r=72, cx=110, cy=110, inner=45;
   const total=tasks.reduce((s,t)=>s+t.hours,0);
   const unalloc=Math.max(0,dayLen-total);
   const all=[...tasks,...(unalloc>0.001?[{id:"free",hours:unalloc,color:T.donutFree}]:[])];
+
+  // Global dim: below 4h dayLen colors start fading. At 0h → 0.18, at 4h+ → 1.0
+  const globalBright=Math.max(0.18, Math.min(1, dayLen/4));
+
+  // Per-segment: task with tiny slice gets dimmer. share=0 → 0.35, share=1 → 1.0
+  const getSegBright=(hours)=>{
+    if(dayLen<=0) return 0.35;
+    const share=hours/dayLen;
+    return Math.max(0.35, Math.min(1, 0.35 + 0.65*share*all.length));
+  };
+
+  const [dragSeg,setDragSeg]=useState(null);   // index in tasks[] being dragged
+  const [overSeg,setOverSeg]=useState(null);   // index in tasks[] being hovered
+  const longPressRef=useRef(null);
+  const svgRef=useRef();
+
+  // Build segment angles
+  const segs=[];
   let a=-Math.PI/2;
+  for(let i=0;i<all.length;i++){
+    const t=all[i];
+    const sw=(t.hours/dayLen)*2*Math.PI;
+    if(sw<0.002){segs.push(null);a+=sw;continue;}
+    segs.push({t,startA:a,sw,endA:a+sw});
+    a+=sw;
+  }
+
+  const getTaskIdxFromAngle=(e)=>{
+    const rect=svgRef.current.getBoundingClientRect();
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const clientY=e.touches?e.touches[0].clientY:e.clientY;
+    const x=(clientX-rect.left)/rect.width*size-cx;
+    const y=(clientY-rect.top)/rect.height*size-cy;
+    const dist=Math.sqrt(x*x+y*y);
+    if(dist<inner||dist>r+12) return null;
+    let angle=Math.atan2(y,x);
+    for(let i=0;i<segs.length;i++){
+      const s=segs[i];
+      if(!s||s.t.id==="free") continue;
+      // normalize angle into segment's range
+      let normA=((angle-s.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+      let normSw=((s.endA-s.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+      if(normA<=normSw) return i; // i == index in all[], which equals tasks[] index for non-free
+    }
+    return null;
+  };
+
+  const onPointerDown=(i)=>(e)=>{
+    if(all[i].id==="free") return;
+    e.preventDefault();
+    const taskIdx=i; // same index in tasks[]
+    longPressRef.current=setTimeout(()=>{
+      try{if(navigator.vibrate)navigator.vibrate([10,30,10]);}catch{}
+      setDragSeg(taskIdx);
+      svgRef.current?.setPointerCapture(e.pointerId);
+    },400);
+  };
+
+  const onPointerMove=(e)=>{
+    if(dragSeg===null) return;
+    e.preventDefault();
+    const idx=getTaskIdxFromAngle(e);
+    if(idx!==null&&all[idx]&&all[idx].id!=="free"&&idx!==dragSeg){
+      setOverSeg(idx);
+    } else {
+      setOverSeg(null);
+    }
+  };
+
+  const onPointerUp=(e)=>{
+    clearTimeout(longPressRef.current);
+    if(dragSeg!==null&&overSeg!==null&&overSeg!==dragSeg){
+      onReorder(dragSeg,overSeg);
+    }
+    setDragSeg(null);
+    setOverSeg(null);
+  };
+
+  const onPointerCancel=()=>{
+    clearTimeout(longPressRef.current);
+    setDragSeg(null);
+    setOverSeg(null);
+  };
+
+  const pathFor=(seg)=>{
+    const {startA,sw}=seg;
+    const x1=cx+r*Math.cos(startA),y1=cy+r*Math.sin(startA);
+    const x2=cx+r*Math.cos(startA+sw),y2=cy+r*Math.sin(startA+sw);
+    return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
+  };
+
   return(
-    <svg width={size} height={size} style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}>
-      {all.map((t,i)=>{
-        const sw=(t.hours/dayLen)*2*Math.PI;
-        if(sw<0.002)return null;
-        const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a);a+=sw;
-        const x2=cx+r*Math.cos(a),y2=cy+r*Math.sin(a);
-        const d=`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
-        return <path key={t.id||i} d={d} fill={t.done?"#444":t.color} stroke={T.bg} strokeWidth={1.5} opacity={t.done?0.4:1}/>;
+    <svg ref={svgRef} width={size} height={size}
+      style={{position:"absolute",top:0,left:0,pointerEvents:"auto",touchAction:"none",cursor:dragSeg!==null?"grabbing":"default"}}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    >
+      {segs.map((seg,i)=>{
+        if(!seg) return null;
+        const t=seg.t;
+        const isFree=t.id==="free";
+        const isThisDragging=dragSeg===i;
+        const isThisOver=overSeg===i;
+        const scale=isThisDragging?1.08:isThisOver?0.94:1;
+        const segBright=isFree?globalBright:globalBright*getSegBright(t.hours);
+        const baseOpacity=t.done?0.4:1;
+        return(
+          <g key={t.id||i}
+            style={{
+              transformOrigin:`${cx}px ${cy}px`,
+              transform:`scale(${scale})`,
+              transition:dragSeg!==null?"transform 0.15s ease":"transform 0.25s ease",
+              cursor:isFree?"default":dragSeg!==null?"grabbing":"grab",
+              opacity: isThisDragging?1:(baseOpacity*segBright),
+            }}
+            onPointerDown={isFree?undefined:onPointerDown(i)}
+          >
+            <path
+              d={pathFor(seg)}
+              fill={isThisOver?"#888":(t.done?"#444":t.color)}
+              stroke={isThisDragging?t.color:T.bg}
+              strokeWidth={isThisDragging?2.5:1.5}
+              style={{
+                filter:isThisDragging?`drop-shadow(0 0 6px ${t.color}88)`:"none",
+                transition:"fill 0.3s,opacity 0.3s,filter 0.15s",
+              }}
+            />
+          </g>
+        );
       })}
-      <circle cx={cx} cy={cy} r={inner} fill={T.bg}/>
-      <text x={cx} y={cy-7} textAnchor="middle" fill={T.text} fontSize={12} fontFamily="'Space Mono',monospace" fontWeight="bold">{hm(total)}</text>
-      <text x={cx} y={cy+9} textAnchor="middle" fill={T.textMuted} fontSize={8} fontFamily="'Space Mono',monospace">allocated</text>
+      {(()=>{
+        const doneHours=tasks.filter(t=>t.done).reduce((s,t)=>s+t.hours,0);
+        const remaining=Math.max(0,dayLen-doneHours);
+        const allDone=tasks.length>0&&tasks.every(t=>t.done);
+        return(<>
+          <circle cx={cx} cy={cy} r={inner} fill={T.bg} style={{pointerEvents:"none"}}/>
+          <text x={cx} y={cy-7} textAnchor="middle" fill={allDone?"#4ECDC4":T.text} fontSize={12} fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>{allDone?"✓":hm(remaining)}</text>
+          <text x={cx} y={cy+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":allDone?"#4ECDC4":T.textMuted} fontSize={8} fontFamily="'Space Mono',monospace" style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":allDone?"done!":"left"}</text>
+        </>);
+      })()}
     </svg>
   );
 }
 
 // ── Linear Slider ─────────────────────────────────────────────────────────────
+// ── Color brightness helpers ──────────────────────────────────────────────────
+function hexToHsl(hex){
+  let r=parseInt(hex.slice(1,3),16)/255;
+  let g=parseInt(hex.slice(3,5),16)/255;
+  let b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;default:h=((r-g)/d+4)/6;}
+  }
+  return[h*360,s*100,l*100];
+}
+function hslToHex(h,s,l){
+  s/=100;l/=100;
+  const k=n=>(n+h/30)%12;
+  const a=s*Math.min(l,1-l);
+  const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return '#'+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');
+}
+// Adjust a hex color's lightness by a delta (-100..100) and saturation by sDelta
+function adjustColor(hex,lDelta,sDelta=0){
+  if(!hex||!hex.startsWith('#')||hex.length<7) return hex;
+  try{
+    const[h,s,l]=hexToHsl(hex);
+    return hslToHex(h,Math.max(0,Math.min(100,s+sDelta)),Math.max(0,Math.min(100,l+lDelta)));
+  }catch{return hex;}
+}
+
 function Slider({value,max,color,step,locked,onChange}){
   const ref=useRef();const drag=useRef(false);
   const lastSnapped=useRef(value);
@@ -450,10 +610,16 @@ function Btn44({onClick,danger,children,title}){
   );
 }
 
-function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onFav,isFav,dragHandleProps}){
+function TaskCard({task,stepMinutes,dayLen,totalTaskHours,T,onChange,onDelete,onEdit,onLock,onFav,isFav,onLongPressStart,onLongPressEnd}){
   const done=!!task.done;
   const pct=dayLen>0?Math.round((task.hours/dayLen)*100):0;
   const lastTap=useRef(0);
+
+  // Slider color: relative to other tasks — bigger share = more vivid/bright
+  const shareOfTasks=totalTaskHours>0?task.hours/totalTaskHours:0;
+  const lDelta=-18 + shareOfTasks * 36;
+  const sDelta=-20 + shareOfTasks * 45;
+  const sliderColor=done?"#555":adjustColor(task.color,lDelta,sDelta);
   const handleSliderTap=(e)=>{
     if(e.type==="pointerdown"){
       const now=Date.now();
@@ -462,29 +628,35 @@ function TaskCard({task,stepMinutes,dayLen,T,onChange,onDelete,onEdit,onLock,onF
     }
   };
   return(
-    <div style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"opacity 0.25s,filter 0.25s",opacity:done?0.45:1,filter:done?"grayscale(0.7)":"none"}}>
+    <div
+      style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}}
+      onPointerDown={onLongPressStart}
+      onPointerUp={onLongPressEnd}
+      onPointerCancel={onLongPressEnd}
+      onContextMenu={e=>e.preventDefault()}
+    >
       <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-        {/* Drag handle */}
-        <div {...dragHandleProps} style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:12,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
+        {/* Drag handle hint */}
+        <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:12,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
         <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:done?"#555":task.color,border:"none",flexShrink:0,boxShadow:done?"none":`0 0 6px ${task.color}88`,padding:0}}/>
         <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:done?"line-through":"none"}}>{task.name}</span>
         <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:done?T.textFaint:task.color,fontWeight:"bold",flexShrink:0}}>{hm(task.hours)}</span>
         <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:T.textFaint,flexShrink:0,opacity:0.7}}>{pct}%</span>
-        <div style={{display:"flex",gap:0,flexShrink:0}}>
+        <div style={{display:"flex",gap:0,flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
           <Btn44 onClick={()=>onChange({done:!done})} title={done?"Undo":"Done"}>
             <span style={{fontSize:12,opacity:done?1:0.3}}>{done?"✅":"☑️"}</span>
           </Btn44>
-          <Btn44 onClick={onFav} title={isFav?"Unfavourite":"Favourite"}>
-            <span style={{fontSize:12,color:isFav?"#FFB347":"inherit",opacity:isFav?1:0.3}}>★</span>
-          </Btn44>
+          {!isFav&&<Btn44 onClick={onFav} title="Mark as goal achieved">
+            <span style={{fontSize:12,opacity:0.3}}>★</span>
+          </Btn44>}
           <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}>
             <span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span>
           </Btn44>
           {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
         </div>
       </div>
-      <div onPointerDown={handleSliderTap}>
-        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={done?"#555":task.color} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
+      <div onPointerDown={e=>{handleSliderTap(e);e.stopPropagation();}}>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
       </div>
     </div>
   );
@@ -574,8 +746,11 @@ function App(){
   const [confirmReset, setConfirmReset]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [showFavs,setShowFavs]=useState(false);
-  const [dragIdx,setDragIdx]=useState(null);
   const [dragOver,setDragOver]=useState(null);
+  const [longDragIdx,setLongDragIdx]=useState(null); // which task is floating
+  const [dragPos,setDragPos]=useState({x:0,y:0});
+  const longPressTimer=useRef(null);
+  const taskListRef=useRef();
   const fileRef=useRef(),inputRef=useRef();
 
   const {tasks,favs,step,dark,showTL,dayStart,dayEnd}=state;
@@ -603,6 +778,54 @@ function App(){
     setNewName("");
     inputRef.current?.blur();
   };
+
+  // ── Long-press drag handlers ──────────────────────────────────────────────
+  const startLongDrag=(i,e)=>{
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const clientY=e.touches?e.touches[0].clientY:e.clientY;
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current=setTimeout(()=>{
+      try{if(navigator.vibrate)navigator.vibrate([12,40,12]);}catch{}
+      setLongDragIdx(i);
+      setDragPos({x:clientX,y:clientY});
+    },400);
+  };
+  const cancelLongPress=()=>clearTimeout(longPressTimer.current);
+
+  useEffect(()=>{
+    if(longDragIdx===null) return;
+    const onMove=(e)=>{
+      const clientX=e.touches?e.touches[0].clientX:e.clientX;
+      const clientY=e.touches?e.touches[0].clientY:e.clientY;
+      setDragPos({x:clientX,y:clientY});
+      // find which task index we're over
+      const els=taskListRef.current?.querySelectorAll("[data-taskcard]");
+      if(!els) return;
+      let found=null;
+      for(let i=0;i<els.length;i++){
+        const r=els[i].getBoundingClientRect();
+        if(clientY>=r.top&&clientY<=r.bottom){found=i;break;}
+      }
+      setDragOver(found!==null&&found!==longDragIdx?found:null);
+    };
+    const onUp=()=>{
+      if(dragOver!==null&&longDragIdx!==null&&dragOver!==longDragIdx){
+        dispatch({type:"REORDER_TASKS",from:longDragIdx,to:dragOver});
+      }
+      setLongDragIdx(null);
+      setDragOver(null);
+    };
+    window.addEventListener("pointermove",onMove,{passive:true});
+    window.addEventListener("pointerup",onUp);
+    window.addEventListener("touchmove",onMove,{passive:true});
+    window.addEventListener("touchend",onUp);
+    return()=>{
+      window.removeEventListener("pointermove",onMove);
+      window.removeEventListener("pointerup",onUp);
+      window.removeEventListener("touchmove",onMove);
+      window.removeEventListener("touchend",onUp);
+    };
+  },[longDragIdx,dragOver]);
 
   const exportMD=()=>{
     const blob=new Blob([serializeMD(tasks,dayStart,dayEnd)],{type:"text/markdown"});
@@ -662,7 +885,7 @@ function App(){
                 dayStart={dayStart} dayEnd={dayEnd} T={T}
                 onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}
               />
-              <Donut tasks={tasks} T={T} dayLen={dayLen}/>
+              <Donut tasks={tasks} T={T} dayLen={dayLen} onReorder={(from,to)=>dispatch({type:"REORDER_TASKS",from,to})}/>
             </div>
 
             {/* Legend + start now */}
@@ -841,36 +1064,77 @@ function App(){
               <div style={{fontSize:10,color:T.textFaint,opacity:0.6,marginTop:4}}>Add one below ↓</div>
             </div>
           )}
-          {tasks.map((t,i)=>{
-            const isDragging=dragIdx===i;
-            const isOver=dragOver===i&&dragIdx!==i;
+          {/* brightness based on total allocation ratio */}
+          {(()=>{
             return(
-              <div key={t.id}
-                style={{opacity:isDragging?0.4:1,transform:isOver?"translateY(-2px)":"none",transition:"opacity 0.15s,transform 0.1s"}}
-                onDragOver={e=>{e.preventDefault();setDragOver(i);}}
-                onDrop={e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i){dispatch({type:"REORDER_TASKS",from:dragIdx,to:i});}setDragIdx(null);setDragOver(null);}}
-                onDragEnd={()=>{setDragIdx(null);setDragOver(null);}}
-              >
-                <TaskCard task={t} stepMinutes={step} dayLen={dayLen} T={T}
-                  onChange={patch=>dispatch({type:"UPD_TASK",id:t.id,patch})}
-                  onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
-                  onEdit={()=>setEditTask({...t})}
-                  onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
-                  isFav={favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase())}
-                  onFav={()=>{
-                    if(favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase()))
-                      dispatch({type:"DEL_FAV",name:t.name});
-                    else dispatch({type:"ADD_FAV",task:t});
-                  }}
-                  dragHandleProps={{
-                    draggable:true,
-                    onDragStart:()=>setDragIdx(i),
-                  }}
-                />
+              <div ref={taskListRef} style={{opacity:longDragIdx!==null?0.92:1,transition:"opacity 0.2s"}}>
+                {tasks.map((t,i)=>{
+                  const isFloating=longDragIdx===i;
+                  const isOver=dragOver===i;
+                  return(
+                    <div key={t.id}
+                      data-taskcard={i}
+                      style={{
+                        opacity:isFloating?0.25:1,
+                        transform:isOver?"translateY(-3px) scale(1.01)":isFloating?"scale(0.97)":"none",
+                        transition:"opacity 0.2s,transform 0.15s",
+                        filter:isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none",
+                        borderRadius:12,
+                      }}
+                    >
+                      <TaskCard task={t} stepMinutes={step} dayLen={dayLen} totalTaskHours={total} T={T}
+                        onChange={patch=>dispatch({type:"UPD_TASK",id:t.id,patch})}
+                        onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
+                        onEdit={()=>setEditTask({...t})}
+                        onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
+                        isFav={favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase())}
+                        onFav={()=>{
+                          if(favs.some(f=>f.name.toLowerCase()===t.name.toLowerCase()))
+                            dispatch({type:"DEL_FAV",name:t.name});
+                          else dispatch({type:"ADD_FAV",task:t});
+                        }}
+                        onLongPressStart={(e)=>startLongDrag(i,e)}
+                        onLongPressEnd={cancelLongPress}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             );
-          })}
+          })()}
         </div>
+
+        {/* FLOATING DRAG CARD */}
+        {longDragIdx!==null&&tasks[longDragIdx]&&(()=>{
+          const t=tasks[longDragIdx];
+          return(
+            <div style={{
+              position:"fixed",
+              left:dragPos.x-140,
+              top:dragPos.y-28,
+              width:280,
+              zIndex:300,
+              pointerEvents:"none",
+              animation:"floatIn 0.15s ease",
+              filter:`drop-shadow(0 8px 24px ${t.color}66)`,
+            }}>
+              <div style={{
+                background:T.bgCard,
+                border:`2px solid ${t.color}`,
+                borderRadius:12,
+                padding:"10px 14px",
+                display:"flex",
+                alignItems:"center",
+                gap:8,
+                transform:"rotate(-1.5deg) scale(1.04)",
+              }}>
+                <div style={{width:12,height:12,borderRadius:"50%",background:t.color,boxShadow:`0 0 8px ${t.color}`}}/>
+                <span style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+                <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:t.color,fontWeight:"bold"}}>{hm(t.hours)}</span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ADD TASK */}
         <div style={{display:"flex",gap:8,marginBottom:24}}>
