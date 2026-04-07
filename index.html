@@ -14,47 +14,1397 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<link rel="stylesheet" href="styles.css"/>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root { --brightness: 1; --contrast: 1; }
+html, body { min-height: 100dvh; background: #1c1c1e; color: #f5f5f5; transition: background 0.25s; overscroll-behavior-y: none; }
+
+/* ── Form elements ────────────────────────────────────────────────────────── */
+textarea, input { outline: none; -webkit-appearance: none; appearance: none; }
+button { -webkit-appearance: none; appearance: none; touch-action: manipulation; cursor: pointer; }
+input[type="text"], input[type="color"], textarea { font-size: 16px !important; } /* prevent iOS zoom */
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { border-radius: 2px; background: #444; }
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes slideIn  { from { opacity: 0; transform: translateY(-8px);               } to { opacity: 1; transform: translateY(0);            } }
+@keyframes toastIn  { from { opacity: 0; transform: translateY(12px);               } to { opacity: 1; transform: translateY(0);            } }
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(20px);               } to { opacity: 1; transform: translateY(0);            } }
+@keyframes fadeIn   { from { opacity: 0;                                             } to { opacity: 1;                                      } }
+@keyframes floatIn  { from { opacity: 0; transform: rotate(-1.5deg) scale(0.9);     } to { opacity: 1; transform: rotate(-1.5deg) scale(1.04); } }
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.15s ease; backdrop-filter: blur(4px);
+}
+.modal-sheet { width: 100%; max-width: 520px; animation: fadeUp 0.22s ease; }
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.sticky-header { position: sticky; top: 0; left: 0; width: 100%; z-index: 20; }
+
+/* ── Responsive breakpoints ───────────────────────────────────────────────── */
+@media (min-width: 600px) {
+  .main-wrap     { max-width: 600px !important; }
+  .modal-overlay { align-items: center; }
+  .modal-sheet   { border-radius: 16px !important; max-width: 460px; }
+}
+@media (min-width: 900px) {
+  .main-wrap { max-width: 720px !important; }
+}
+</style>
 </head>
 <body style="background:#1c1c1e">
 <div id="root"></div>
-
-<!-- Load order: constants → helpers → store → components → app → boot -->
-<script type="text/babel" src="constants.js"   data-type="module"></script>
-<script type="text/babel" src="helpers.js"      data-type="module"></script>
-<script type="text/babel" src="store.js"        data-type="module"></script>
-<script type="text/babel" src="components/CircularDaySlider.js" data-type="module"></script>
-<script type="text/babel" src="components/Donut.js"             data-type="module"></script>
-<script type="text/babel" src="components/components.js"        data-type="module"></script>
-<script type="text/babel" src="App.js"          data-type="module"></script>
-
 <script type="text/babel">
-// ── Bootstrap ─────────────────────────────────────────────────────────────────
-// Expose shared helpers on window so each file can access them without a
-// bundler. In a real build pipeline (Vite / webpack) these would be ES module
-// imports instead.
-import { PALETTE, STEPS, DARK, LIGHT, STORAGE_KEY }       from "./constants.js";
-import { formatHours, saveState, parseMD, serializeMD,
-         adjustColor, migrateOldData }                     from "./helpers.js";
-import { initState, reducer }                              from "./store.js";
-import { CircularDaySlider }                               from "./components/CircularDaySlider.js";
-import { Donut }                                           from "./components/Donut.js";
-import { Slider, Btn44, TaskCard, EditModal,
-         Timeline, ThemeToggle, FileBtn }                  from "./components/components.js";
-import { App }                                             from "./App.js";
+const { useState, useRef, useEffect, useCallback, useReducer } = React;
 
-// Make everything available globally (replaces the old single-file globals)
-Object.assign(window, {
-  PALETTE, STEPS, DARK, LIGHT, STORAGE_KEY,
-  formatHours, saveState, parseMD, serializeMD, adjustColor,
-  initState, reducer,
-  CircularDaySlider, Donut,
-  Slider, Btn44, TaskCard, EditModal, Timeline, ThemeToggle, FileBtn,
-});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 1 — CONSTANTS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const STORAGE_KEY = "sliders_data";
+
+const PALETTE = [
+  "#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF",
+  "#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784",
+  "#64B5F6","#FFD54F","#A1887F","#90A4AE",
+];
+
+const STEPS = [
+  { l: "5m",  m: 5  },
+  { l: "10m", m: 10 },
+  { l: "15m", m: 15 },
+  { l: "30m", m: 30 },
+];
+
+const DARK = {
+  bg: "#1c1c1e", bgCard: "#2a2a2e", bgInput: "#323236", bgSlider: "#484850",
+  border: "#505058", borderMid: "#626268",
+  text: "#ffffff", textSub: "#e8e8e8", textMuted: "#c0c0c0", textDim: "#a0a0a0", textFaint: "#888890",
+  donutFree: "#3a3a3e", tc: "#1c1c1e",
+};
+
+const LIGHT = {
+  bg: "#f4f3ef", bgCard: "#eceae4", bgInput: "#e4e2db", bgSlider: "#d8d6cf",
+  border: "#cac8c1", borderMid: "#bbb9b2",
+  text: "#1a1a1a", textSub: "#2e2e2e", textMuted: "#555", textDim: "#777", textFaint: "#999",
+  donutFree: "#d8d6cf", tc: "#f4f3ef",
+};
+
+const DEFAULT_TASKS = [
+  { id: 1, name: "Sleep",    hours: 8, originalHours: 8, color: PALETTE[0], locked: false, actual: 0 },
+  { id: 2, name: "Work",     hours: 6, originalHours: 6, color: PALETTE[1], locked: false, actual: 0 },
+  { id: 3, name: "Exercise", hours: 1, originalHours: 1, color: PALETTE[2], locked: false, actual: 0 },
+];
+
+// Timing
+const LONG_PRESS_DELAY_MS = 400;
+const TOAST_DURATION_MS   = 2500;
+const CONFIRM_TIMEOUT_MS  = 3000;
+const SLIDER_LERP_SPEED   = 0.3;
+const DONUT_LERP_SPEED    = 0.22;
+const FLOAT_TOLERANCE     = 0.001;
+const SLIDER_TOLERANCE    = 0.0005;
+const ANGLE_TOLERANCE     = 0.0008;
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 2 — HELPERS
+// Pure functions: no side effects, no React.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** Format decimal hours as a readable string, e.g. 1.5 → "1h 30m" */
+function formatHours(h) {
+  const totalMinutes = Math.round(h * 60);
+  const hours   = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours   === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+/** Snap a value in hours to the nearest step boundary. */
+function snapToStep(hours, stepMinutes) {
+  return Math.round(hours * 60 / stepMinutes) * stepMinutes / 60;
+}
+
+/** Read and parse app state from localStorage. Returns null on failure. */
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** Persist app state to localStorage. Silently ignores quota/security errors. */
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+
+/** One-time migration from legacy versioned localStorage keys. */
+function migrateOldData() {
+  const OLD_KEYS = ["sliders_v5", "sliders_v4", "sliders_v3", "sliders_v2", "sliders_v1"];
+  try {
+    if (localStorage.getItem(STORAGE_KEY)) return;
+    for (const oldKey of OLD_KEYS) {
+      const data = localStorage.getItem(oldKey);
+      if (data) { localStorage.setItem(STORAGE_KEY, data); break; }
+    }
+  } catch {}
+}
+
+/**
+ * Shrink-only scaling: when the day window shrinks below the sum of task hours,
+ * compress tasks proportionally to fit. When the window is larger, do nothing.
+ */
+function scaleTasksToTotal(tasks, targetTotal) {
+  if (tasks.length === 0) return tasks;
+  const currentSum = tasks.reduce((sum, t) => sum + (t.hours || 0), 0);
+  if (targetTotal >= currentSum - FLOAT_TOLERANCE) return tasks;
+  if (currentSum <= 0) return tasks;
+  const targetMinutes = Math.round(targetTotal * 60);
+  let assigned = 0;
+  const newMinutes = tasks.map((t, i) => {
+    if (i === tasks.length - 1) return Math.max(0, targetMinutes - assigned);
+    const m = Math.round((t.hours || 0) / currentSum * targetMinutes);
+    assigned += m;
+    return m;
+  });
+  return tasks.map((t, i) => ({ ...t, hours: Math.max(0, newMinutes[i] / 60) }));
+}
+
+/** Parse a previously-exported markdown file back into tasks + day window. */
+function parseMD(text) {
+  const tasks = [];
+  let dayStart = null, dayEnd = null;
+  for (const line of text.split("\n")) {
+    const dayMatch = line.match(/^> Day: (\d+(?:\.\d+)?):(\d+) → (\d+(?:\.\d+)?):(\d+)/);
+    if (dayMatch) {
+      dayStart = parseInt(dayMatch[1]) + (dayMatch[2] === "30" ? 0.5 : 0);
+      dayEnd   = parseInt(dayMatch[3]) + (dayMatch[4] === "30" ? 0.5 : 0);
+    }
+    const taskMatch = line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6})?/);
+    if (taskMatch) {
+      tasks.push({
+        id: Date.now() + Math.random(),
+        name: taskMatch[1].trim(),
+        hours: parseFloat(taskMatch[2]),
+        originalHours: parseFloat(taskMatch[2]),
+        color: taskMatch[3] || PALETTE[tasks.length % PALETTE.length],
+        locked: false, actual: 0,
+      });
+    }
+  }
+  return { tasks, dayStart, dayEnd };
+}
+
+/** Serialize current state to a markdown string for export/backup. */
+function serializeMD(tasks, dayStart = 0, dayEnd = 24) {
+  const dayLength   = dayEnd - dayStart;
+  const total       = tasks.reduce((s, t) => s + t.hours, 0);
+  const unallocated = Math.max(0, dayLength - total);
+  const toTime = h => `${String(Math.floor(h)).padStart(2,"0")}:${h % 1 ? "30" : "00"}`;
+  let out = `# Sliders — Daily Time Allocation\n\n`;
+  out += `> Day: ${toTime(dayStart)} → ${toTime(dayEnd)} (${formatHours(dayLength)})\n`;
+  out += `> Total: ${formatHours(total)} / ${formatHours(dayLength)} | Unallocated: ${formatHours(unallocated)}\n\n---\n\n`;
+  for (const t of tasks) {
+    const pctStr = dayLength > 0 ? ((t.hours / dayLength) * 100).toFixed(1) : "—";
+    out += `## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n`;
+    out += `- Planned: ${formatHours(t.hours)} (${pctStr}%)\n`;
+    out += `- Actual: ${formatHours(t.actual || 0)}\n\n`;
+  }
+  return out + `---\n_Generated by Sliders App_\n`;
+}
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1,3),16)/255;
+  let g = parseInt(hex.slice(3,5),16)/255;
+  let b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h, s, l = (max+min)/2;
+  if (max === min) { h = s = 0; } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g<b?6:0)) / 6; break;
+      case g: h = ((b-r)/d + 2) / 6; break;
+      default: h = ((r-g)/d + 4) / 6;
+    }
+  }
+  return [h*360, s*100, l*100];
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h/30) % 12;
+  const a = s * Math.min(l, 1-l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+  return "#" + [f(0),f(8),f(4)].map(x => Math.round(x*255).toString(16).padStart(2,"0")).join("");
+}
+
+/** Adjust a hex colour's lightness (and optionally saturation). */
+function adjustColor(hex, lightnessDelta, saturationDelta = 0) {
+  if (!hex || !hex.startsWith("#") || hex.length < 7) return hex;
+  try {
+    const [h, s, l] = hexToHsl(hex);
+    return hslToHex(
+      h,
+      Math.max(0, Math.min(100, s + saturationDelta)),
+      Math.max(0, Math.min(100, l + lightnessDelta)),
+    );
+  } catch { return hex; }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 3 — STATE  (initState + reducer)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function initState() {
+  const saved = loadState();
+  return {
+    tasks:    saved?.tasks    ?? DEFAULT_TASKS,
+    favs:     saved?.favs     ?? [],
+    step:     saved?.step     ?? 15,
+    dark:     saved?.dark     ?? true,
+    showTL:   saved?.showTL   ?? false,
+    dayStart: saved?.dayStart ?? 0,
+    dayEnd:   saved?.dayEnd   ?? 24,
+  };
+}
+
+function reducer(state, action) {
+  const dayLength = state.dayEnd - state.dayStart;
+
+  switch (action.type) {
+
+    case "ADD_TASK": {
+      const { name, color, hours } = action;
+      const matchingFav   = state.favs.find(f => f.name.toLowerCase() === name.toLowerCase());
+      const totalAllocated = state.tasks.reduce((s, t) => s + t.hours, 0);
+      const remaining     = Math.max(0, dayLength - totalAllocated);
+      const rawHours      = hours !== undefined ? hours
+                          : matchingFav ? matchingFav.hours
+                          : snapToStep(Math.min(state.step / 60, remaining), state.step);
+      const clampedHours  = Math.max(0, Math.min(rawHours, remaining || state.step / 60));
+      const resolvedColor = color || matchingFav?.color || PALETTE[state.tasks.length % PALETTE.length];
+      return {
+        ...state,
+        tasks: [...state.tasks, {
+          id: Date.now(), name, hours: clampedHours, originalHours: clampedHours,
+          color: resolvedColor, locked: false, actual: 0,
+        }],
+      };
+    }
+
+    case "UPD_TASK": {
+      const updatedTasks = state.tasks.map(t => {
+        if (t.id !== action.id) return t;
+        const updated = { ...t, ...action.patch };
+        // Keep originalHours in sync when user manually moves a slider
+        if (action.patch.hours !== undefined) updated.originalHours = action.patch.hours;
+        return updated;
+      });
+      // Keep favourites in sync when hours or colour changes
+      let updatedFavs = state.favs;
+      if (action.patch.hours !== undefined || action.patch.color !== undefined) {
+        const originalTask = state.tasks.find(t => t.id === action.id);
+        if (originalTask && state.favs.some(f => f.name.toLowerCase() === originalTask.name.toLowerCase())) {
+          updatedFavs = state.favs.map(f =>
+            f.name.toLowerCase() === originalTask.name.toLowerCase()
+              ? { ...f, ...(action.patch.hours !== undefined && { hours: action.patch.hours }),
+                        ...(action.patch.color !== undefined && { color: action.patch.color }) }
+              : f
+          );
+        }
+      }
+      return { ...state, tasks: updatedTasks, favs: updatedFavs };
+    }
+
+    case "DEL_TASK":
+      return { ...state, tasks: state.tasks.filter(t => t.id !== action.id) };
+
+    case "SET_TASKS":
+      return { ...state, tasks: action.tasks };
+
+    case "ADD_FAV": {
+      const t = action.task;
+      if (state.favs.some(f => f.name.toLowerCase() === t.name.toLowerCase())) return state;
+      return { ...state, favs: [...state.favs, { name: t.name, hours: t.hours, color: t.color }] };
+    }
+
+    case "DEL_FAV":
+      return { ...state, favs: state.favs.filter(f => f.name.toLowerCase() !== action.name.toLowerCase()) };
+
+    case "DISTRIBUTE": {
+      const unlocked = state.tasks.filter(t => !t.locked);
+      if (!unlocked.length) return state;
+      const lockedHours = state.tasks.filter(t => t.locked).reduce((s, t) => s + t.hours, 0);
+      const hoursEach   = snapToStep((dayLength - lockedHours) / unlocked.length, state.step);
+      return { ...state, tasks: state.tasks.map(t => t.locked ? t : { ...t, hours: hoursEach, originalHours: hoursEach }) };
+    }
+
+    case "SET_DAY_WINDOW": {
+      const { start, end } = action;
+      const newLength = end - start;
+      if (newLength <= 0) return state;
+      const oldLength = state.dayEnd - state.dayStart;
+      // If window grew, restore originalHours first; shrink-only logic handles the rest
+      const restored = newLength > oldLength
+        ? state.tasks.map(t => ({ ...t, hours: t.originalHours ?? t.hours }))
+        : state.tasks;
+      return { ...state, dayStart: start, dayEnd: end, tasks: scaleTasksToTotal(restored, newLength) };
+    }
+
+    case "SET_DAY_START": {
+      const { start } = action;
+      if (start >= state.dayEnd) return state;
+      return { ...state, dayStart: start, tasks: scaleTasksToTotal(state.tasks, state.dayEnd - start) };
+    }
+
+    case "REORDER_TASKS": {
+      const { from, to } = action;
+      const tasks = [...state.tasks];
+      const [moved] = tasks.splice(from, 1);
+      tasks.splice(to, 0, moved);
+      return { ...state, tasks };
+    }
+
+    case "SET_STEP":    return { ...state, step:   action.step };
+    case "SET_DARK":    return { ...state, dark:   action.dark };
+    case "SET_SHOW_TL": return { ...state, showTL: action.v   };
+
+    default: return state;
+  }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 4 — COMPONENT: CircularDaySlider
+// Ring slider with two drag handles (start = teal, end = orange).
+// Hours 0–24 map to 0–360°, starting from the top (−90°).
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const RING_SIZE   = 220;
+const RING_CX     = 110;
+const RING_CY     = 110;
+const RING_RADIUS = 88;
+const RING_THUMB  = 9;
+const RING_STROKE = 10;
+const RING_START_COLOR = "#4ECDC4";
+const RING_END_COLOR   = "#FF6B2B";
+
+const FULL_CIRCLE_PATH = `M ${RING_CX} ${RING_CY - RING_RADIUS} A ${RING_RADIUS} ${RING_RADIUS} 0 1 1 ${RING_CX - 0.001} ${RING_CY - RING_RADIUS}`;
+
+function hourToAngle(h) { return (h / 24) * 2 * Math.PI - Math.PI / 2; }
+function angleToHour(a) {
+  const deg = ((a + Math.PI / 2) / (2 * Math.PI) * 24 + 24) % 24;
+  return Math.round(deg * 2) / 2; // snap to 30-min
+}
+function ringArcPath(a1, a2) {
+  let span = ((a2 - a1) + 2 * Math.PI) % (2 * Math.PI);
+  if (span === 0) span = 2 * Math.PI;
+  const large = span > Math.PI ? 1 : 0;
+  const x1 = RING_CX + RING_RADIUS * Math.cos(a1), y1 = RING_CY + RING_RADIUS * Math.sin(a1);
+  const x2 = RING_CX + RING_RADIUS * Math.cos(a2), y2 = RING_CY + RING_RADIUS * Math.sin(a2);
+  return `M ${x1} ${y1} A ${RING_RADIUS} ${RING_RADIUS} 0 ${large} 1 ${x2} ${y2}`;
+}
+
+function RingTimeLabel({ hour, angleRad, color }) {
+  const labelR = RING_RADIUS + 22;
+  const lx = RING_CX + labelR * Math.cos(angleRad);
+  const ly = RING_CY + labelR * Math.sin(angleRad);
+  const anchor = lx < RING_CX - 10 ? "end" : lx > RING_CX + 10 ? "start" : "middle";
+  const label  = `${String(Math.floor(hour)).padStart(2,"0")}:${hour % 1 ? "30" : "00"}`;
+  return (
+    <text x={lx} y={ly+4} textAnchor={anchor} fill={color} fontSize={9}
+      fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>
+      {label}
+    </text>
+  );
+}
+
+function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
+  const svgRef   = useRef();
+  const dragging = useRef(null); // 'start' | 'end' | null
+
+  const aStart  = hourToAngle(dayStart);
+  const aEnd    = hourToAngle(dayEnd);
+  const dayLen  = dayEnd - dayStart;
+
+  const thumbPos = a => ({ x: RING_CX + RING_RADIUS * Math.cos(a), y: RING_CY + RING_RADIUS * Math.sin(a) });
+  const tStart   = thumbPos(aStart);
+  const tEnd     = thumbPos(aEnd);
+
+  const getAngleFromEvent = e => {
+    const rect    = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) / rect.width  * RING_SIZE - RING_CX;
+    const y = (clientY - rect.top)  / rect.height * RING_SIZE - RING_CY;
+    return Math.atan2(y, x);
+  };
+
+  const onPointerDown = which => e => {
+    e.preventDefault(); e.stopPropagation();
+    dragging.current = which;
+    svgRef.current.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = e => {
+    if (!dragging.current) return;
+    const h = angleToHour(getAngleFromEvent(e));
+    if (dragging.current === "start") onChange(Math.max(0, Math.min(h, dayEnd - 0.5)), dayEnd);
+    else                              onChange(dayStart, Math.max(dayStart + 0.5, Math.min(h, 24)));
+  };
+
+  const onPointerUp = () => { dragging.current = null; };
+
+  const arcOpacity     = 0.2 + 0.8 * Math.max(0, Math.min(1, dayLen / 24));
+  const centerTimeRange = `${String(Math.floor(dayStart)).padStart(2,"0")}:${dayStart%1?"30":"00"}–${String(Math.floor(dayEnd)).padStart(2,"0")}:${dayEnd%1?"30":"00"}`;
+
+  return (
+    <div style={{position:"relative", width:RING_SIZE, height:RING_SIZE, flexShrink:0}}>
+      <svg ref={svgRef} width={RING_SIZE} height={RING_SIZE}
+        style={{display:"block", touchAction:"none", userSelect:"none", overflow:"visible"}}
+        onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+
+        {/* Background ring */}
+        <path d={FULL_CIRCLE_PATH} fill="none" stroke={T.bgSlider} strokeWidth={RING_STROKE} strokeLinecap="round"/>
+
+        {/* Active arc */}
+        <path d={ringArcPath(aStart, aEnd)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE}
+          strokeLinecap="round" opacity={arcOpacity} style={{transition:"opacity 0.3s"}}/>
+
+        {/* Center labels */}
+        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={13}
+          fontFamily="'Space Mono',monospace" fontWeight="bold">{formatHours(dayLen)}</text>
+        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={9}
+          fontFamily="'Space Mono',monospace">{centerTimeRange}</text>
+
+        {/* Start handle (teal) */}
+        <circle cx={tStart.x} cy={tStart.y} r={RING_THUMB+4} fill="transparent"
+          style={{cursor:"grab"}} onPointerDown={onPointerDown("start")}/>
+        <circle cx={tStart.x} cy={tStart.y} r={RING_THUMB} fill={RING_START_COLOR} stroke={T.bg} strokeWidth={2}
+          style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_START_COLOR}88)`}}
+          onPointerDown={onPointerDown("start")}/>
+        <RingTimeLabel hour={dayStart} angleRad={aStart} color={RING_START_COLOR}/>
+
+        {/* End handle (orange) */}
+        <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB+4} fill="transparent"
+          style={{cursor:"grab"}} onPointerDown={onPointerDown("end")}/>
+        <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB} fill={RING_END_COLOR} stroke={T.bg} strokeWidth={2}
+          style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_END_COLOR}88)`}}
+          onPointerDown={onPointerDown("end")}/>
+        <RingTimeLabel hour={dayEnd} angleRad={aEnd} color={RING_END_COLOR}/>
+      </svg>
+    </div>
+  );
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 5 — COMPONENT: Donut
+// Pie/donut chart with animated segments and drag-to-reorder.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const DONUT_SIZE  = 220;
+const DONUT_R     = 72;
+const DONUT_CX    = 110;
+const DONUT_CY    = 110;
+const DONUT_INNER = 45;
+
+function buildSegmentPath(startAngle, sweep) {
+  const x1 = DONUT_CX + DONUT_R * Math.cos(startAngle),           y1 = DONUT_CY + DONUT_R * Math.sin(startAngle);
+  const x2 = DONUT_CX + DONUT_R * Math.cos(startAngle + sweep),   y2 = DONUT_CY + DONUT_R * Math.sin(startAngle + sweep);
+  return `M ${DONUT_CX} ${DONUT_CY} L ${x1} ${y1} A ${DONUT_R} ${DONUT_R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2} ${y2} Z`;
+}
+
+function Donut({ tasks, T, dayLen, onReorder }) {
+  const total     = tasks.reduce((s, t) => s + t.hours, 0);
+  const unalloc   = Math.max(0, dayLen - total);
+  const allSlices = [...tasks, ...(unalloc > FLOAT_TOLERANCE ? [{ id: "free", hours: unalloc, color: T.donutFree }] : [])];
+
+  // Global dim: short days fade the whole donut
+  const globalBrightness    = Math.max(0.18, Math.min(1, dayLen / 4));
+  const getSegmentBrightness = hours => {
+    if (dayLen <= 0) return 0.35;
+    return Math.max(0.35, Math.min(1, 0.35 + 0.65 * (hours / dayLen) * allSlices.length));
+  };
+
+  const [dragSeg, setDragSeg] = useState(null);
+  const [overSeg, setOverSeg] = useState(null);
+  const longPressRef = useRef(null);
+  const svgRef       = useRef();
+  const wrapRef      = useRef();
+
+  // ── Smooth angle animation ─────────────────────────────────────────────────
+  const animAngles   = useRef({});  // {id: {startA, sw}} — current animated state
+  const targetAngles = useRef({});  // {id: {startA, sw}} — target state
+  const animRaf      = useRef(null);
+  const [, forceRender] = useReducer(x => x + 1, 0);
+
+  const computeTargets = useCallback(() => {
+    const targets = {};
+    let angle = -Math.PI / 2;
+    for (const slice of allSlices) {
+      const sweep = (slice.hours / dayLen) * 2 * Math.PI;
+      targets[slice.id] = { startA: angle, sw: Math.max(0, sweep) };
+      angle += sweep;
+    }
+    return targets;
+  }, [allSlices, dayLen]);
+
+  const lerpAngle = (a, b, t) => a + (b - a) * t;
+
+  const startAnimation = useCallback(() => {
+    if (animRaf.current) return;
+    const run = () => {
+      const target  = targetAngles.current;
+      const current = animAngles.current;
+      let needMore = false;
+      const next = {};
+      for (const id of Object.keys(target)) {
+        const t = target[id];
+        const c = current[id] || { startA: t.startA, sw: t.sw };
+        if (Math.abs(t.startA - c.startA) < ANGLE_TOLERANCE && Math.abs(t.sw - c.sw) < ANGLE_TOLERANCE) {
+          next[id] = { startA: t.startA, sw: t.sw };
+        } else {
+          next[id] = { startA: lerpAngle(c.startA, t.startA, DONUT_LERP_SPEED), sw: lerpAngle(c.sw, t.sw, DONUT_LERP_SPEED) };
+          needMore = true;
+        }
+      }
+      animAngles.current = next;
+      forceRender();
+      animRaf.current = needMore ? requestAnimationFrame(run) : null;
+    };
+    animRaf.current = requestAnimationFrame(run);
+  }, []);
+
+  useEffect(() => {
+    const targets = computeTargets();
+    targetAngles.current = targets;
+    // Seed new segments immediately so they don't animate in from zero
+    for (const id of Object.keys(targets)) {
+      if (!animAngles.current[id]) animAngles.current[id] = { ...targets[id] };
+    }
+    startAnimation();
+  }, [tasks, dayLen]);
+
+  useEffect(() => () => { if (animRaf.current) cancelAnimationFrame(animRaf.current); }, []);
+
+  const segs = allSlices.map(slice => {
+    const aState = animAngles.current[slice.id] || targetAngles.current[slice.id];
+    if (!aState || aState.sw < 0.002) return null;
+    return { slice, startA: aState.startA, sw: aState.sw, endA: aState.startA + aState.sw };
+  });
+
+  // ── Hit-testing ────────────────────────────────────────────────────────────
+  const getSegIndexFromEvent = e => {
+    const rect = (wrapRef.current || svgRef.current).getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) / rect.width  * DONUT_SIZE - DONUT_CX;
+    const y = (clientY - rect.top)  / rect.height * DONUT_SIZE - DONUT_CY;
+    const dist = Math.sqrt(x*x + y*y);
+    if (dist < DONUT_INNER || dist > DONUT_R + 12) return null;
+    const angle = Math.atan2(y, x);
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      if (!seg || seg.slice.id === "free") continue;
+      const normA  = ((angle - seg.startA)        % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+      const normSw = ((seg.endA - seg.startA) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+      if (normA <= normSw) return i;
+    }
+    return null;
+  };
+
+  // ── Pointer handlers ───────────────────────────────────────────────────────
+  const onPointerDown = i => e => {
+    if (allSlices[i].id === "free") return;
+    e.preventDefault();
+    wrapRef.current?.setPointerCapture(e.pointerId);
+    longPressRef.current = setTimeout(() => {
+      try { if (navigator.vibrate) navigator.vibrate([10, 30, 10]); } catch {}
+      setDragSeg(i);
+    }, LONG_PRESS_DELAY_MS);
+  };
+
+  const onPointerMove = e => {
+    if (dragSeg === null) return;
+    e.preventDefault();
+    const idx = getSegIndexFromEvent(e);
+    setOverSeg(idx !== null && allSlices[idx]?.id !== "free" && idx !== dragSeg ? idx : null);
+  };
+
+  const onPointerUp = () => {
+    clearTimeout(longPressRef.current);
+    if (dragSeg !== null && overSeg !== null && overSeg !== dragSeg) onReorder(dragSeg, overSeg);
+    setDragSeg(null); setOverSeg(null);
+  };
+
+  const onPointerCancel = () => {
+    clearTimeout(longPressRef.current);
+    setDragSeg(null); setOverSeg(null);
+  };
+
+  return (
+    <div ref={wrapRef}
+      style={{position:"absolute", top:0, left:0, width:DONUT_SIZE, height:DONUT_SIZE, pointerEvents: dragSeg !== null ? "auto" : "none"}}
+      onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
+      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE}
+        style={{position:"absolute", top:0, left:0, pointerEvents:"none", touchAction:"none", cursor: dragSeg !== null ? "grabbing" : "default"}}>
+
+        {segs.map((seg, i) => {
+          if (!seg) return null;
+          const { slice } = seg;
+          const isFree     = slice.id === "free";
+          const isDragging = dragSeg === i;
+          const isOver     = overSeg === i;
+          const scale      = isDragging ? 1.08 : isOver ? 0.94 : 1;
+          const brightness = isFree ? globalBrightness : globalBrightness * getSegmentBrightness(slice.hours);
+          return (
+            <g key={slice.id || i}
+              style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`, transform:`scale(${scale})`,
+                transition: dragSeg !== null ? "transform 0.15s ease" : "transform 0.25s ease",
+                cursor: isFree ? "default" : dragSeg !== null ? "grabbing" : "grab",
+                opacity: isDragging ? 1 : (slice.done ? 0.4 : 1) * brightness}}
+              pointerEvents={isFree ? "none" : "auto"}
+              onPointerDown={isFree ? undefined : onPointerDown(i)}>
+              <path
+                d={buildSegmentPath(seg.startA, seg.sw)}
+                fill={isOver ? "#888" : (slice.done ? "#444" : slice.color)}
+                stroke={isDragging ? slice.color : T.bg}
+                strokeWidth={isDragging ? 2.5 : 1.5}
+                style={{filter: isDragging ? `drop-shadow(0 0 6px ${slice.color}88)` : "none",
+                  transition:"fill 0.3s,opacity 0.3s,filter 0.15s"}}/>
+            </g>
+          );
+        })}
+
+        {/* Centre hole + labels */}
+        <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_INNER} fill={T.bg} style={{pointerEvents:"none"}}/>
+        <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={T.text} fontSize={12}
+          fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>
+          {formatHours(total)}
+        </text>
+        <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle"
+          fill={dragSeg !== null ? "#FF6B2B" : T.textMuted} fontSize={8}
+          fontFamily="'Space Mono',monospace" style={{pointerEvents:"none", transition:"fill 0.2s"}}>
+          {dragSeg !== null ? "swap ↕" : "left"}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 6 — COMPONENT: Slider
+// Linear drag slider. Uses direct DOM refs for the fill and thumb so that
+// pointer-move updates skip React re-renders, keeping drags smooth.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function Slider({ value, max, color, step, locked, onChange }) {
+  const trackRef   = useRef();
+  const displayRef = useRef(); // fill bar  — updated directly on pointer move
+  const thumbRef   = useRef(); // thumb pos — updated directly on pointer move
+  const isDragging   = useRef(false);
+  const lastSnapped  = useRef(value);
+  const animFrame    = useRef(null);
+  const targetRaw    = useRef(value);
+  const currentRaw   = useRef(value);
+
+  const applyPercent = pct => {
+    const p = Math.max(0, Math.min(100, pct));
+    if (displayRef.current) displayRef.current.style.width = p + "%";
+    if (thumbRef.current)   thumbRef.current.style.left   = p + "%";
+  };
+
+  const animateTo = targetHours => {
+    targetRaw.current = targetHours;
+    if (animFrame.current) return;
+    const run = () => {
+      const diff = targetRaw.current - currentRaw.current;
+      if (Math.abs(diff) < SLIDER_TOLERANCE) {
+        currentRaw.current = targetRaw.current;
+        applyPercent((currentRaw.current / max) * 100);
+        animFrame.current = null;
+        return;
+      }
+      currentRaw.current += diff * SLIDER_LERP_SPEED;
+      applyPercent((currentRaw.current / max) * 100);
+      animFrame.current = requestAnimationFrame(run);
+    };
+    animFrame.current = requestAnimationFrame(run);
+  };
+
+  useEffect(() => { animateTo(value); }, [value, max]);
+  useEffect(() => () => { if (animFrame.current) cancelAnimationFrame(animFrame.current); }, []);
+
+  const getRawHours = useCallback(clientX => {
+    const rect = trackRef.current.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * max;
+  }, [max]);
+
+  const getSnappedHours = useCallback(clientX => {
+    return snapToStep(getRawHours(clientX), step);
+  }, [getRawHours, step]);
+
+  const tryHaptic = () => { try { if (navigator.vibrate) navigator.vibrate(4); } catch {} };
+
+  const onPointerDown = e => {
+    if (locked) return;
+    e.preventDefault();
+    isDragging.current = true;
+    trackRef.current.setPointerCapture(e.pointerId);
+    // Instant jump to finger — no lerp on first touch
+    const raw = getRawHours(e.clientX);
+    currentRaw.current = raw; targetRaw.current = raw;
+    applyPercent((raw / max) * 100);
+    const snapped = getSnappedHours(e.clientX);
+    onChange(snapped);
+    lastSnapped.current = snapped;
+  };
+
+  const onPointerMove = e => {
+    if (!isDragging.current) return;
+    animateTo(getRawHours(e.clientX));
+    const snapped = getSnappedHours(e.clientX);
+    if (snapped !== lastSnapped.current) { tryHaptic(); lastSnapped.current = snapped; }
+    onChange(snapped);
+  };
+
+  const onPointerUp = e => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const snapped = getSnappedHours(e.clientX);
+    onChange(snapped);
+    animateTo(snapped);
+  };
+
+  const initPct = (value / max) * 100;
+
+  return (
+    <div ref={trackRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      style={{position:"relative", height:36, borderRadius:8, cursor: locked ? "not-allowed" : "pointer", userSelect:"none", touchAction: locked ? "pan-y" : "none", overflow:"hidden"}}>
+      <div style={{position:"absolute", inset:0, background:"var(--bg-slider)", borderRadius:8}}/>
+      <div ref={displayRef} style={{position:"absolute", left:0, top:0, bottom:0, width:`${initPct}%`, background:`linear-gradient(90deg,${color}55,${color}cc)`, borderRadius:8}}/>
+      <div ref={thumbRef} style={{position:"absolute", left:`${initPct}%`, top:"50%", transform:"translate(-50%,-50%)", width:22, height:28, background: locked ? "#555" : color, borderRadius:5, boxShadow: locked ? "none" : `0 2px 10px ${color}88`, pointerEvents:"none", display:"flex", alignItems:"center", justifyContent:"center", transition:"background 0.2s"}}>
+        {locked
+          ? <span style={{fontSize:9, color:"#fff", opacity:0.7}}>🔒</span>
+          : <div style={{width:2, height:10, background:"rgba(0,0,0,0.25)", borderRadius:1}}/>}
+      </div>
+    </div>
+  );
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 7 — SMALL UI COMPONENTS
+// Btn44, TaskCard, EditModal, Timeline, ThemeToggle, FileBtn
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** Standard 36×36 touch-target icon button. */
+function Btn44({ onClick, danger, children, title }) {
+  return (
+    <button onClick={onClick} title={title}
+      style={{background:"none", border:"none", width:36, height:36, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, transition:"background 0.15s"}}
+      onTouchStart={e => e.currentTarget.style.background = danger ? "#ff444430" : "rgba(128,128,128,0.15)"}
+      onTouchEnd={e   => e.currentTarget.style.background = "none"}
+      onMouseEnter={e => e.currentTarget.style.background = danger ? "#ff444430" : "rgba(128,128,128,0.15)"}
+      onMouseLeave={e => e.currentTarget.style.background = "none"}
+    >{children}</button>
+  );
+}
+
+function TaskCard({ task, stepMinutes, dayLen, totalTaskHours, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
+  const done = !!task.done;
+  const pct  = dayLen > 0 ? Math.round((task.hours / dayLen) * 100) : 0;
+
+  // Desaturate sliders for small tasks relative to the largest one
+  const shareOfTasks = totalTaskHours > 0 ? task.hours / totalTaskHours : 0;
+  const sliderColor  = done ? "#555" : adjustColor(task.color, (shareOfTasks - 1) * 15, (shareOfTasks - 1) * 55);
+
+  return (
+    <div
+      style={{background:T.bgCard, border:`1px solid ${done?"#404040":T.border}`, borderRadius:12, padding:"10px 12px 9px", marginBottom:7, transition:"background 0.25s,border 0.25s", userSelect:"none"}}
+      onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd}
+      onContextMenu={e => e.preventDefault()}>
+      <div style={{display:"flex", alignItems:"center", gap:7, marginBottom:8}}>
+        <div style={{cursor:"grab", padding:"0 2px", color:T.textFaint, fontSize:12, flexShrink:0, userSelect:"none", touchAction:"none"}}>⠿</div>
+        <button onClick={onEdit} style={{width:16, height:16, borderRadius:"50%", background: done ? "#555" : task.color, border:"none", flexShrink:0, boxShadow: done ? "none" : `0 0 6px ${task.color}88`, padding:0}}/>
+        <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace", fontSize:12, color: done ? T.textFaint : T.text, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:"pointer", textDecoration: done ? "line-through" : "none"}}>
+          {task.name}
+        </span>
+        <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color: done ? T.textFaint : task.color, fontWeight:"bold", flexShrink:0}}>
+          {formatHours(task.hours)}
+        </span>
+        <span style={{fontFamily:"'Space Mono',monospace", fontSize:9, color:T.textFaint, flexShrink:0, opacity:0.7}}>{pct}%</span>
+        <div style={{display:"flex", gap:0, flexShrink:0}} onPointerDown={e => e.stopPropagation()}>
+          <Btn44 onClick={() => onChange({ done: !done })} title={done ? "Undo" : "Done"}>
+            <span style={{fontSize:12, opacity: done ? 1 : 0.3}}>{done ? "✅" : "☑️"}</span>
+          </Btn44>
+          {!isFav && <Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12, opacity:0.3}}>★</span></Btn44>}
+          <Btn44 onClick={onLock} title={task.locked ? "Unlock" : "Lock"}>
+            <span style={{fontSize:12, opacity: task.locked ? 1 : 0.3}}>🔒</span>
+          </Btn44>
+          {!task.locked && <Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11, color:T.textDim}}>✕</span></Btn44>}
+        </div>
+      </div>
+      <div onPointerDown={e => e.stopPropagation()}>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor}
+          locked={task.locked || done} onChange={h => onChange({ hours: h })}/>
+      </div>
+    </div>
+  );
+}
+
+function EditModal({ task, T, onSave, onClose }) {
+  const [name,  setName]  = useState(task.name);
+  const [color, setColor] = useState(task.color);
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-sheet" style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:"16px 16px 0 0", padding:24}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20}}>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:22, letterSpacing:2, color:T.text}}>EDIT TASK</span>
+          <button onClick={onClose} style={{background:"none", border:"none", color:T.textMuted, fontSize:22, width:44, height:44, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center"}}>✕</button>
+        </div>
+        <label style={{fontSize:10, color:T.textDim, letterSpacing:2, display:"block", marginBottom:6}}>TASK NAME</label>
+        <input value={name} onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && onSave({ name: name.trim() || task.name, color })}
+          style={{width:"100%", background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", color:T.text, fontFamily:"'Space Mono',monospace", fontSize:15, marginBottom:20}}/>
+        <label style={{fontSize:10, color:T.textDim, letterSpacing:2, display:"block", marginBottom:10}}>COLOR</label>
+        <div style={{display:"flex", flexWrap:"wrap", gap:10, marginBottom:20}}>
+          {PALETTE.map(c => (
+            <button key={c} onClick={() => setColor(c)}
+              style={{width:36, height:36, borderRadius:"50%", background:c, border: color === c ? `3px solid ${T.text}` : "2px solid transparent", padding:0, boxShadow: color === c ? `0 0 0 2px ${T.bg}, 0 0 0 4px ${c}` : "none", transition:"all 0.15s"}}/>
+          ))}
+        </div>
+        <button onClick={() => onSave({ name: name.trim() || task.name, color })}
+          style={{width:"100%", background:"#FF6B2B", border:"none", borderRadius:12, padding:"15px", color:"#000", fontFamily:"'Space Mono',monospace", fontSize:14, fontWeight:"bold", letterSpacing:1, minHeight:52}}>
+          SAVE CHANGES
+        </button>
+        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
+      </div>
+    </div>
+  );
+}
+
+function Timeline({ tasks, T, dayLen, dayStart }) {
+  const visibleTasks = tasks.filter(t => t.hours > 0.02);
+  let cursor = 0;
+  const segments = visibleTasks.map(t => { const s = cursor; cursor += t.hours; return { ...t, start: s }; });
+  const ticks    = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round((dayStart + f * dayLen) * 2) / 2);
+  return (
+    <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 14px 10px", marginBottom:16}}>
+      <div style={{position:"relative", height:36, borderRadius:6, overflow:"hidden", background:T.bgSlider, marginBottom:6}}>
+        {segments.map(s => {
+          const left  = (s.start / dayLen) * 100;
+          const width = (s.hours / dayLen) * 100;
+          return (
+            <div key={s.id} style={{position:"absolute", left:`${left}%`, width:`${width}%`, top:0, bottom:0, background: s.done ? "#444" : s.color, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", minWidth:2, opacity: s.done ? 0.45 : 1}}>
+              {width > 7 && <span style={{fontSize:9, color:"rgba(0,0,0,0.65)", fontFamily:"'Space Mono',monospace", whiteSpace:"nowrap", padding:"0 4px", fontWeight:"bold"}}>{s.name}</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"flex", justifyContent:"space-between", fontFamily:"'Space Mono',monospace", fontSize:9, color:T.textFaint, paddingLeft:2, paddingRight:2}}>
+        {ticks.map((h, i) => <span key={i}>{String(Math.floor(h)).padStart(2,"0")}:{h%1?"30":"00"}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function ThemeToggle({ dark, onToggle, T }) {
+  return (
+    <button onClick={onToggle} style={{display:"flex", alignItems:"center", gap:6, background:"none", border:`1px solid ${T.border}`, borderRadius:20, padding:"6px 10px", minHeight:36}}>
+      <span style={{fontSize:13}}>{dark ? "☀️" : "🌙"}</span>
+      <div style={{width:28, height:16, borderRadius:8, background: dark ? "#444" : T.borderMid, position:"relative", transition:"background 0.2s", flexShrink:0}}>
+        <div style={{position:"absolute", top:2, left: dark ? 12 : 2, width:12, height:12, borderRadius:"50%", background:"#FF6B2B", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
+      </div>
+    </button>
+  );
+}
+
+function FileBtn({ label, onClick, danger, dark }) {
+  return (
+    <button onClick={onClick}
+      style={{background: danger ? (dark?"#3a0a0a":"#e8c0c0") : (dark?"#0e0e10":"#d0cec8"), border:`1px solid ${danger?"#ff5555":(dark?"#505055":"#a8a6a0")}`, borderRadius:10, padding:"12px 10px", minHeight:48, color: danger?"#ff7777":(dark?"#cccccc":"#2a2a2a"), fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:0.5, width:"100%", transition:"opacity 0.1s"}}
+      onTouchStart={e => e.currentTarget.style.opacity = "0.7"}
+      onTouchEnd={e   => e.currentTarget.style.opacity = "1"}
+    >{label}</button>
+  );
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 8 — MAIN APP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function App() {
+  const [state, dispatch]           = useReducer(reducer, null, initState);
+  const [newName,       setNewName]       = useState("");
+  const [editTask,      setEditTask]      = useState(null);
+  const [toast,         setToast]         = useState(null);
+  const [confirmRm,     setConfirmRm]     = useState(null);
+  const [confirmReset,  setConfirmReset]  = useState(false);
+  const [showSettings,  setShowSettings]  = useState(false);
+  const [showFavs,      setShowFavs]      = useState(false);
+  const [dragOver,      setDragOver]      = useState(null);
+  const [longDragIdx,   setLongDragIdx]   = useState(null);
+  const [dragPos,       setDragPos]       = useState({ x: 0, y: 0 });
+
+  const longPressTimer = useRef(null);
+  const confirmRmTimer = useRef(null);
+  const taskListRef    = useRef();
+  const fileRef        = useRef();
+  const inputRef       = useRef();
+
+  const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
+  const dayLen    = dayEnd - dayStart;
+  const T         = dark ? DARK : LIGHT;
+  const total     = tasks.reduce((s, t) => s + t.hours, 0);
+  const remaining = dayLen - total;
+  const over      = remaining < -FLOAT_TOLERANCE;
+  const perfect   = Math.abs(remaining) < FLOAT_TOLERANCE;
+
+  // Persist state on every change
+  useEffect(() => { saveState(state); }, [state]);
+
+  // Sync CSS custom properties + body colour when theme changes
+  useEffect(() => {
+    document.documentElement.style.setProperty("--bg-slider", T.bgSlider);
+    document.documentElement.style.setProperty("--border-mid", T.borderMid);
+    document.body.style.background = T.bg;
+    document.getElementById("themeColorMeta").content = T.tc;
+  }, [dark]);
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  const showToast = (msg, type = "ok") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), TOAST_DURATION_MS);
+  };
+
+  // ── Confirm-remove (auto-cancels after timeout) ────────────────────────────
+  const setConfirmRmWithTimer = name => {
+    clearTimeout(confirmRmTimer.current);
+    setConfirmRm(name);
+    if (name !== null) confirmRmTimer.current = setTimeout(() => setConfirmRm(null), CONFIRM_TIMEOUT_MS);
+  };
+
+  // ── Add task ───────────────────────────────────────────────────────────────
+  const addTask = (nameArg, colorArg, hoursArg) => {
+    const name = (nameArg || newName).trim();
+    if (!name) return;
+    if (tasks.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      showToast("Task already exists", "err"); return;
+    }
+    dispatch({ type: "ADD_TASK", name, color: colorArg, hours: hoursArg });
+    setConfirmRmWithTimer(null);
+    setNewName("");
+    inputRef.current?.blur();
+  };
+
+  // ── Long-press drag (list reorder) ─────────────────────────────────────────
+  const startLongDrag = (i, e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      try { if (navigator.vibrate) navigator.vibrate([12, 40, 12]); } catch {}
+      setLongDragIdx(i);
+      setDragPos({ x: clientX, y: clientY });
+    }, LONG_PRESS_DELAY_MS);
+  };
+
+  const cancelLongPress = () => clearTimeout(longPressTimer.current);
+
+  useEffect(() => {
+    if (longDragIdx === null) return;
+    const onMove = e => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      setDragPos({ x: clientX, y: clientY });
+      const els = taskListRef.current?.querySelectorAll("[data-taskcard]");
+      if (!els) return;
+      let found = null;
+      for (let i = 0; i < els.length; i++) {
+        const r = els[i].getBoundingClientRect();
+        if (clientY >= r.top && clientY <= r.bottom) { found = i; break; }
+      }
+      setDragOver(found !== null && found !== longDragIdx ? found : null);
+    };
+    const onUp = () => {
+      if (dragOver !== null && longDragIdx !== null && dragOver !== longDragIdx) {
+        dispatch({ type: "REORDER_TASKS", from: longDragIdx, to: dragOver });
+      }
+      setLongDragIdx(null); setDragOver(null);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup",   onUp);
+    window.addEventListener("touchmove",   onMove, { passive: true });
+    window.addEventListener("touchend",    onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup",   onUp);
+      window.removeEventListener("touchmove",   onMove);
+      window.removeEventListener("touchend",    onUp);
+    };
+  }, [longDragIdx, dragOver]);
+
+  // ── Export / import ────────────────────────────────────────────────────────
+  const exportMD = () => {
+    const blob = new Blob([serializeMD(tasks, dayStart, dayEnd)], { type: "text/markdown" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = "sliders.md"; a.click();
+    URL.revokeObjectURL(url);
+    showToast("Exported ✓");
+  };
+
+  const handleFile = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { tasks: parsed, dayStart: ds, dayEnd: de } = parseMD(ev.target.result);
+      if (!parsed.length) { showToast("No tasks found", "err"); return; }
+      dispatch({ type: "SET_TASKS", tasks: parsed });
+      if (ds !== null && de !== null && de > ds) dispatch({ type: "SET_DAY_WINDOW", start: ds, end: de });
+      showToast(`${parsed.length} tasks loaded`);
+    };
+    reader.readAsText(f);
+    e.target.value = "";
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="main-wrap" style={{minHeight:"100dvh", background:T.bg, color:T.text, fontFamily:"'Space Mono',monospace", maxWidth:520, margin:"0 auto", paddingBottom:100, transition:"background 0.25s,color 0.25s"}}>
+
+      {/* HEADER */}
+      <div className="sticky-header" style={{background:T.bg, transition:"background 0.25s"}}>
+        <div style={{padding:"14px 16px 12px", borderBottom:`1px solid ${T.border}`}}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+            <div style={{display:"flex", alignItems:"baseline", gap:8}}>
+              <h1 style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:36, letterSpacing:3, color:"#FF6B2B", lineHeight:1}}>SLIDERS</h1>
+              <span style={{fontFamily:"'Space Mono',monospace", fontSize:8, color:T.textFaint, background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:4, padding:"2px 5px", letterSpacing:1}}>{step}m</span>
+            </div>
+            <div style={{display:"flex", alignItems:"center", gap:10, flexShrink:0}}>
+              <div style={{textAlign:"left", width:96, flexShrink:0}}>
+                <div style={{fontSize:26, fontFamily:"'Bebas Neue',sans-serif", letterSpacing:1, lineHeight:1, color: over?"#ff4444":perfect?"#4ECDC4":T.textSub, whiteSpace:"nowrap"}}>
+                  {perfect ? `${formatHours(dayLen)} ✓` : formatHours(Math.abs(remaining))}
+                </div>
+                <div style={{fontSize:8, color: over?"#ff4444":T.textFaint, letterSpacing:1}}>
+                  {over ? "OVER BY" : perfect ? "ALLOCATED" : "REMAINING"}
+                </div>
+              </div>
+              <div style={{flexShrink:0, width:66}}>
+                <ThemeToggle dark={dark} onToggle={() => dispatch({ type: "SET_DARK", dark: !dark })} T={T}/>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Allocation progress bar */}
+        <div style={{height:2, background:T.bgSlider, position:"relative", overflow:"hidden"}}>
+          <div style={{position:"absolute", left:0, top:0, bottom:0, width:`${Math.min(100,(total/dayLen)*100)}%`, background: over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B", transition:"width 0.2s,background 0.2s", borderRadius:"0 2px 2px 0"}}/>
+        </div>
+      </div>
+
+      <div style={{padding:"0 16px"}}>
+
+        {/* DONUT + CIRCULAR SLIDER */}
+        <div style={{margin:"12px 0", padding:"16px 16px 12px", background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:14}}>
+          <div style={{display:"flex", alignItems:"center", gap:8}}>
+            <div style={{position:"relative", width:220, height:220, flexShrink:0, margin:"14px 16px"}}>
+              <CircularDaySlider dayStart={dayStart} dayEnd={dayEnd} T={T}
+                onChange={(s, e) => dispatch({ type: "SET_DAY_WINDOW", start: s, end: e })}/>
+              <Donut tasks={tasks} T={T} dayLen={dayLen}
+                onReorder={(from, to) => dispatch({ type: "REORDER_TASKS", from, to })}/>
+            </div>
+
+            {/* Legend + start now */}
+            <div style={{flex:1, overflow:"hidden", minWidth:0, display:"flex", flexDirection:"column", gap:0}}>
+              {tasks.map(t => {
+                const pct   = dayLen > 0 ? Math.max(2, (t.hours / dayLen) * 100) : 0;
+                const color = t.done ? "#555" : t.color;
+                return (
+                  <div key={t.id} style={{marginBottom:7, opacity: t.done ? 0.4 : 1, transition:"opacity 0.2s"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:3}}>
+                      <span style={{fontSize:10, color: t.done?T.textFaint:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", textDecoration: t.done?"line-through":"none", maxWidth:"65%", fontFamily:"'Space Mono',monospace"}}>{t.name}</span>
+                      <span style={{fontSize:9, color, flexShrink:0, fontFamily:"'Space Mono',monospace", opacity:0.9}}>{formatHours(t.hours)}</span>
+                    </div>
+                    <div style={{height:4, borderRadius:3, background:T.bgSlider, overflow:"hidden"}}>
+                      <div style={{height:"100%", width:`${pct}%`, borderRadius:3, background:color, boxShadow: t.done?"none":`0 0 6px ${color}66`, transition:"width 0.3s"}}/>
+                    </div>
+                  </div>
+                );
+              })}
+              {remaining > FLOAT_TOLERANCE && (
+                <div style={{marginBottom:7, opacity:0.5}}>
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:3}}>
+                    <span style={{fontSize:10, color:T.textMuted, fontFamily:"'Space Mono',monospace"}}>free</span>
+                    <span style={{fontSize:9, color:T.textMuted, fontFamily:"'Space Mono',monospace"}}>{formatHours(remaining)}</span>
+                  </div>
+                  <div style={{height:4, borderRadius:3, background:T.bgSlider, overflow:"hidden"}}>
+                    <div style={{height:"100%", width:`${Math.max(2,(remaining/dayLen)*100)}%`, borderRadius:3, background:T.borderMid, transition:"width 0.3s"}}/>
+                  </div>
+                </div>
+              )}
+              {tasks.length === 0 && <span style={{fontSize:10, color:T.textFaint}}>No tasks yet</span>}
+              <button
+                onClick={() => {
+                  const now = new Date();
+                  const totalMins = now.getHours() * 60 + now.getMinutes();
+                  dispatch({ type: "SET_DAY_START", start: Math.min(Math.ceil(totalMins / step) * step / 60, 23.5) });
+                  showToast("Start → now ✓");
+                }}
+                style={{marginTop:6, background:"none", border:`1px solid ${T.borderMid}`, borderRadius:8, padding:"7px 10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer", display:"flex", alignItems:"center", gap:5, transition:"all 0.15s", letterSpacing:0.5}}
+                onMouseEnter={e  => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
+                onMouseLeave={e  => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
+                onTouchStart={e  => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
+                onTouchEnd={e    => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
+              ><span>⏱</span> start now</button>
+            </div>
+          </div>
+        </div>
+
+        {/* TIMELINE */}
+        {showTL && <Timeline tasks={tasks} T={T} dayLen={dayLen} dayStart={dayStart}/>}
+
+        {/* SETTINGS */}
+        <div style={{marginBottom:10}}>
+          <div style={{marginBottom:6}}>
+            <button onClick={() => setShowSettings(v => !v)}
+              style={{width:"100%", background:"none", border:`1px solid ${T.border}`, borderRadius:10, padding:"9px 14px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer"}}>
+              <span>⚙ SETTINGS</span>
+              <span style={{fontSize:11}}>{showSettings ? "▲" : "▼"}</span>
+            </button>
+          </div>
+          {showSettings && (
+            <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 16px", animation:"slideIn 0.15s ease"}}>
+
+              {/* Timeline toggle */}
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}`, marginBottom:12}}>
+                <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:T.textSub}}>Timeline view</span>
+                <button onClick={() => dispatch({ type: "SET_SHOW_TL", v: !showTL })}
+                  style={{width:44, height:24, borderRadius:12, background: showTL?"#FF6B2B":"#484850", border:"none", position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0}}>
+                  <div style={{position:"absolute", top:3, left: showTL?22:3, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
+                </button>
+              </div>
+
+              {/* Snap size */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>SNAP SIZE</div>
+                <div style={{display:"flex", gap:6}}>
+                  {STEPS.map(s => {
+                    const active = s.m === step;
+                    return (
+                      <button key={s.m} onClick={() => dispatch({ type: "SET_STEP", step: s.m })}
+                        style={{flex:1, background: active?"#FF6B2B":T.bgInput, border:`1px solid ${active?"#FF6B2B":T.border}`, borderRadius:8, padding:"8px 0", color: active?"#000":T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight: active?"bold":"normal", transition:"all 0.15s"}}>
+                        {s.l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* File export/import */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>FILE</div>
+                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+                  <FileBtn label="⬇ EXPORT .MD" onClick={exportMD} dark={dark}/>
+                  <FileBtn label="⬆ IMPORT .MD" onClick={() => fileRef.current.click()} dark={dark}/>
+                </div>
+              </div>
+              <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
+
+              {/* Danger zone */}
+              <div>
+                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>DANGER</div>
+                {!confirmReset ? (
+                  <button onClick={() => setConfirmReset(true)}
+                    style={{width:"100%", background:"none", border:"1px solid #cc3333", borderRadius:10, padding:"10px", color:"#cc3333", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, cursor:"pointer"}}>
+                    ⚠ RESET APP
+                  </button>
+                ) : (
+                  <div style={{background:"#1a0000", border:"1px solid #ff2222", borderRadius:10, padding:"14px", animation:"slideIn 0.15s ease"}}>
+                    <div style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:"#ff4444", marginBottom:12, lineHeight:1.6}}>
+                      Reset everything?<br/>
+                      <span style={{fontSize:9, color:"#cc4444", opacity:0.8}}>Tasks, favourites and settings will be wiped.</span>
+                    </div>
+                    <div style={{display:"flex", gap:8}}>
+                      <button onClick={() => { localStorage.removeItem(STORAGE_KEY); window.location.reload(); }}
+                        style={{flex:1, background:"#cc0000", border:"none", borderRadius:8, padding:"10px", color:"#fff", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:"bold", minHeight:44}}>YES</button>
+                      <button onClick={() => setConfirmReset(false)}
+                        style={{flex:1, background:"none", border:`1px solid ${dark?"#505055":"#a8a6a0"}`, borderRadius:8, padding:"10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:11, minHeight:44}}>CANCEL</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FAVOURITES */}
+        <div style={{marginBottom:12}}>
+          <button onClick={() => setShowFavs(v => !v)}
+            style={{width:"100%", background:"none", border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 16px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", marginBottom: showFavs?8:0, transition:"margin 0.15s"}}>
+            <span>★ FAVOURITES{favs.length > 0 ? ` (${favs.length})` : ""}</span>
+            <span style={{fontSize:12}}>{showFavs ? "▲" : "▼"}</span>
+          </button>
+          {showFavs && (
+            <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 12px", animation:"slideIn 0.15s ease"}}>
+              {favs.length === 0 && (
+                <div style={{textAlign:"center", padding:"16px 0", fontFamily:"'Space Mono',monospace", fontSize:11, color:T.textFaint, letterSpacing:1}}>NO FAVOURITES YET — STAR A TASK</div>
+              )}
+              <div style={{display:"flex", gap:7, flexWrap:"wrap"}}>
+                {favs.map(f => {
+                  const active  = tasks.some(t => t.name.toLowerCase() === f.name.toLowerCase());
+                  const pending = confirmRm === f.name;
+                  const MAX_CHARS  = 14;
+                  const displayName = pending ? "tap to cancel" : (f.name.length > MAX_CHARS ? f.name.slice(0, MAX_CHARS) + "…" : f.name);
+                  return (
+                    <div key={f.name} style={{display:"flex", alignItems:"center", borderRadius:10, overflow:"hidden", border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`, opacity: active?0.45:1, transition:"all 0.15s"}}>
+                      <button
+                        onClick={() => { if (pending) { setConfirmRmWithTimer(null); return; } if (!active) addTask(f.name, f.color, f.hours); }}
+                        style={{background: pending?"#3a0a0a":active?T.bgCard:`${f.color}22`, border:"none", padding:"8px 12px", display:"flex", alignItems:"center", gap:7, cursor: active&&!pending?"default":"pointer", minHeight:40}}>
+                        <div style={{width:8, height:8, borderRadius:"50%", background: pending?"#ff5555":f.color, flexShrink:0}}/>
+                        <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color: pending?"#ff7777":active?T.textFaint:T.text, whiteSpace:"nowrap"}}>{displayName}</span>
+                        {!pending && <span style={{fontFamily:"'Space Mono',monospace", fontSize:10, color:f.color, opacity:0.8}}>{formatHours(f.hours)}</span>}
+                      </button>
+                      <button
+                        onClick={() => pending ? (dispatch({ type: "DEL_FAV", name: f.name }), setConfirmRmWithTimer(null)) : setConfirmRmWithTimer(f.name)}
+                        style={{background: pending?"#ff444430":"none", border:"none", borderLeft:`1px solid ${pending?"#ff5555":T.border}`, padding:"8px 10px", color: pending?"#ff5555":T.textDim, fontSize:11, cursor:"pointer", minHeight:40, display:"flex", alignItems:"center", fontFamily:"'Space Mono',monospace", transition:"all 0.15s"}}
+                        onMouseEnter={e => { if (!pending) e.currentTarget.style.color = "#ff5555"; }}
+                        onMouseLeave={e => { if (!pending) e.currentTarget.style.color = T.textDim; }}
+                      >{pending ? "remove" : "✕"}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* TASKS */}
+        <div style={{marginBottom:12}}>
+          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+            <div style={{fontSize:10, color:T.textDim, letterSpacing:2, fontFamily:"'Space Mono',monospace"}}>
+              TASKS{tasks.length > 0 ? ` · ${tasks.filter(t => t.done).length}/${tasks.length} done` : ""}
+            </div>
+            {tasks.length > 1 && (
+              <button
+                onClick={() => { dispatch({ type: "DISTRIBUTE" }); showToast("Distributed ✓"); }}
+                style={{background:"none", border:`1px solid ${T.borderMid}`, borderRadius:7, padding:"4px 10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer", letterSpacing:0.5, transition:"all 0.15s"}}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
+              >⇄ distribute</button>
+            )}
+          </div>
+
+          {tasks.length === 0 && (
+            <div style={{textAlign:"center", padding:"28px 0 20px", borderRadius:12, border:`1px dashed ${T.border}`}}>
+              <div style={{fontSize:24, marginBottom:8}}>📋</div>
+              <div style={{fontSize:11, color:T.textFaint, letterSpacing:1}}>No tasks yet</div>
+              <div style={{fontSize:10, color:T.textFaint, opacity:0.6, marginTop:4}}>Add one below ↓</div>
+            </div>
+          )}
+
+          <div ref={taskListRef} style={{opacity: longDragIdx !== null ? 0.92 : 1, transition:"opacity 0.2s"}}>
+            {tasks.map((t, i) => {
+              const isFloating = longDragIdx === i;
+              const isOver     = dragOver === i;
+              return (
+                <div key={t.id} data-taskcard={i}
+                  style={{opacity: isFloating?0.25:1, transform: isOver?"translateY(-3px) scale(1.01)":isFloating?"scale(0.97)":"none", transition:"opacity 0.2s,transform 0.15s", filter: isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none", borderRadius:12}}>
+                  <TaskCard task={t} stepMinutes={step} dayLen={dayLen} totalTaskHours={total} T={T}
+                    onChange={patch => dispatch({ type: "UPD_TASK", id: t.id, patch })}
+                    onDelete={() => dispatch({ type: "DEL_TASK", id: t.id })}
+                    onEdit={() => setEditTask({ ...t })}
+                    onLock={() => dispatch({ type: "UPD_TASK", id: t.id, patch: { locked: !t.locked } })}
+                    isFav={favs.some(f => f.name.toLowerCase() === t.name.toLowerCase())}
+                    onFav={() => {
+                      if (favs.some(f => f.name.toLowerCase() === t.name.toLowerCase()))
+                        dispatch({ type: "DEL_FAV", name: t.name });
+                      else
+                        dispatch({ type: "ADD_FAV", task: t });
+                    }}
+                    onLongPressStart={e => startLongDrag(i, e)}
+                    onLongPressEnd={cancelLongPress}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* FLOATING DRAG CARD */}
+        {longDragIdx !== null && tasks[longDragIdx] && (() => {
+          const t = tasks[longDragIdx];
+          return (
+            <div style={{position:"fixed", left:dragPos.x-140, top:dragPos.y-28, width:280, zIndex:300, pointerEvents:"none", animation:"floatIn 0.15s ease", filter:`drop-shadow(0 8px 24px ${t.color}66)`}}>
+              <div style={{background:T.bgCard, border:`2px solid ${t.color}`, borderRadius:12, padding:"10px 14px", display:"flex", alignItems:"center", gap:8, transform:"rotate(-1.5deg) scale(1.04)"}}>
+                <div style={{width:12, height:12, borderRadius:"50%", background:t.color, boxShadow:`0 0 8px ${t.color}`}}/>
+                <span style={{fontFamily:"'Space Mono',monospace", fontSize:12, color:T.text, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{t.name}</span>
+                <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:t.color, fontWeight:"bold"}}>{formatHours(t.hours)}</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ADD TASK */}
+        <div style={{display:"flex", gap:8, marginBottom:24}}>
+          <input ref={inputRef} value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addTask()}
+            placeholder="Add a task…"
+            style={{flex:1, background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:10, padding:"13px 16px", color:T.text, fontFamily:"'Space Mono',monospace", fontSize:14, transition:"border-color 0.2s"}}
+            onFocus={e => e.target.style.borderColor = "#FF6B2B"}
+            onBlur={e  => e.target.style.borderColor = T.border}
+          />
+          <button onClick={() => addTask()}
+            style={{background:"#FF6B2B", border:"none", borderRadius:10, padding:"13px 18px", color:"#000", fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:1, flexShrink:0, minWidth:70, minHeight:52, transition:"opacity 0.1s"}}
+            onTouchStart={e => e.currentTarget.style.opacity = "0.75"}
+            onTouchEnd={e   => e.currentTarget.style.opacity = "1"}
+            onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+          >ADD</button>
+        </div>
+      </div>
+
+      {/* EDIT MODAL */}
+      {editTask && (
+        <EditModal task={editTask} T={T}
+          onSave={patch => { dispatch({ type: "UPD_TASK", id: editTask.id, patch }); setEditTask(null); showToast("Task updated ✓"); }}
+          onClose={() => setEditTask(null)}/>
+      )}
+
+      {/* TOAST */}
+      {toast && (
+        <div style={{position:"fixed", bottom:"calc(20px + env(safe-area-inset-bottom,0px))", left:"50%", transform:"translateX(-50%)", zIndex:200, background: toast.type==="err"?"#ff444422":"#FF6B2B22", border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`, borderRadius:24, padding:"12px 22px", fontFamily:"'Space Mono',monospace", fontSize:12, color: toast.type==="err"?"#ff7777":"#FF6B2B", animation:"toastIn 0.2s ease", whiteSpace:"nowrap", backdropFilter:"blur(8px)"}}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SECTION 9 — BOOTSTRAP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 migrateOldData();
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
