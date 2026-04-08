@@ -273,11 +273,11 @@ function initState() {
   return {
     tasks:    saved?.tasks    ?? DEFAULT_TASKS,
     favs:     saved?.favs     ?? [],
-    step:     saved?.step     ?? 15,
+    step:     saved?.step     ?? 10,
     dark:     saved?.dark     ?? true,
     showTL:   saved?.showTL   ?? false,
-    dayStart: saved?.dayStart ?? 0,
-    dayEnd:   saved?.dayEnd   ?? 24,
+    dayStart: saved?.dayStart ?? 10.5,
+    dayEnd:   saved?.dayEnd   ?? 16,
   };
 }
 
@@ -433,16 +433,55 @@ function RingTimeLabel({ hour, angleRad, color }) {
 }
 
 function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
-  const svgRef   = useRef();
-  const dragging = useRef(null); // 'start' | 'end' | null
+  const svgRef      = useRef();
+  const dragging    = useRef(null); // 'start' | 'end' | null
 
-  const aStart  = hourToAngle(dayStart);
-  const aEnd    = hourToAngle(dayEnd);
-  const dayLen  = dayEnd - dayStart;
+  // We track two "display" angles that always animate smoothly.
+  // During drag: lerp toward raw finger angle (no snap jitter).
+  // When not dragging: lerp toward the snapped prop values.
+  const dispStartA  = useRef(hourToAngle(dayStart));
+  const dispEndA    = useRef(hourToAngle(dayEnd));
+  const rawStartA   = useRef(hourToAngle(dayStart)); // raw finger angle during drag
+  const rawEndA     = useRef(hourToAngle(dayEnd));
+  const animRaf     = useRef(null);
+  const [, tick]    = useReducer(x => x + 1, 0);
+
+  const RING_LERP = 0.22;
+  const RING_TOL  = 0.0005;
+
+  // Animation loop — runs continuously while animRaf is set
+  const ensureAnim = useCallback(() => {
+    if (animRaf.current) return;
+    const run = () => {
+      const tS = dragging.current ? rawStartA.current : hourToAngle(dayStart);
+      const tE = dragging.current ? rawEndA.current   : hourToAngle(dayEnd);
+      const dS = tS - dispStartA.current;
+      const dE = tE - dispEndA.current;
+      const more = Math.abs(dS) > RING_TOL || Math.abs(dE) > RING_TOL;
+      dispStartA.current += dS * RING_LERP;
+      dispEndA.current   += dE * RING_LERP;
+      if (!more) {
+        dispStartA.current = tS;
+        dispEndA.current   = tE;
+        animRaf.current    = null;
+        tick();
+        return;
+      }
+      tick();
+      animRaf.current = requestAnimationFrame(run);
+    };
+    animRaf.current = requestAnimationFrame(run);
+  }, [dayStart, dayEnd]);
+
+  // Kick off animation whenever props change (snapped value committed)
+  useEffect(() => { ensureAnim(); }, [dayStart, dayEnd]);
+  useEffect(() => () => { if (animRaf.current) cancelAnimationFrame(animRaf.current); }, []);
+
+  const dayLen = dayEnd - dayStart;
 
   const thumbPos = a => ({ x: RING_CX + RING_RADIUS * Math.cos(a), y: RING_CY + RING_RADIUS * Math.sin(a) });
-  const tStart   = thumbPos(aStart);
-  const tEnd     = thumbPos(aEnd);
+  const tStart   = thumbPos(dispStartA.current);
+  const tEnd     = thumbPos(dispEndA.current);
 
   const getAngleFromEvent = e => {
     const rect    = svgRef.current.getBoundingClientRect();
@@ -461,12 +500,20 @@ function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
 
   const onPointerMove = e => {
     if (!dragging.current) return;
-    const h = angleToHour(getAngleFromEvent(e));
-    if (dragging.current === "start") onChange(Math.max(0, Math.min(h, dayEnd - 0.5)), dayEnd);
-    else                              onChange(dayStart, Math.max(dayStart + 0.5, Math.min(h, 24)));
+    const rawA = getAngleFromEvent(e);
+    const h    = angleToHour(rawA);
+    if (dragging.current === "start") {
+      rawStartA.current = rawA;
+      ensureAnim();
+      onChange(Math.max(0, Math.min(h, dayEnd - 0.5)), dayEnd);
+    } else {
+      rawEndA.current = rawA;
+      ensureAnim();
+      onChange(dayStart, Math.max(dayStart + 0.5, Math.min(h, 24)));
+    }
   };
 
-  const onPointerUp = () => { dragging.current = null; };
+  const onPointerUp = () => { dragging.current = null; ensureAnim(); };
 
   const arcOpacity     = 0.2 + 0.8 * Math.max(0, Math.min(1, dayLen / 24));
   const centerTimeRange = `${String(Math.floor(dayStart)).padStart(2,"0")}:${dayStart%1?"30":"00"}–${String(Math.floor(dayEnd)).padStart(2,"0")}:${dayEnd%1?"30":"00"}`;
@@ -481,7 +528,7 @@ function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
         <path d={FULL_CIRCLE_PATH} fill="none" stroke={T.bgSlider} strokeWidth={RING_STROKE} strokeLinecap="round"/>
 
         {/* Active arc */}
-        <path d={ringArcPath(aStart, aEnd)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE}
+        <path d={ringArcPath(dispStartA.current, dispEndA.current)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE}
           strokeLinecap="round" opacity={arcOpacity} style={{transition:"opacity 0.3s"}}/>
 
         {/* Center labels */}
@@ -496,7 +543,7 @@ function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
         <circle cx={tStart.x} cy={tStart.y} r={RING_THUMB} fill={RING_START_COLOR} stroke={T.bg} strokeWidth={2}
           style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_START_COLOR}88)`}}
           onPointerDown={onPointerDown("start")}/>
-        <RingTimeLabel hour={dayStart} angleRad={aStart} color={RING_START_COLOR}/>
+        <RingTimeLabel hour={dayStart} angleRad={dispStartA.current} color={RING_START_COLOR}/>
 
         {/* End handle (orange) */}
         <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB+4} fill="transparent"
@@ -504,7 +551,7 @@ function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
         <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB} fill={RING_END_COLOR} stroke={T.bg} strokeWidth={2}
           style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_END_COLOR}88)`}}
           onPointerDown={onPointerDown("end")}/>
-        <RingTimeLabel hour={dayEnd} angleRad={aEnd} color={RING_END_COLOR}/>
+        <RingTimeLabel hour={dayEnd} angleRad={dispEndA.current} color={RING_END_COLOR}/>
       </svg>
     </div>
   );
@@ -826,13 +873,14 @@ function Btn44({ onClick, danger, children, title }) {
   );
 }
 
-function TaskCard({ task, stepMinutes, dayLen, totalTaskHours, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
+function TaskCard({ task, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
   const done = !!task.done;
   const pct  = dayLen > 0 ? Math.round((task.hours / dayLen) * 100) : 0;
 
-  // Desaturate sliders for small tasks relative to the largest one
-  const shareOfTasks = totalTaskHours > 0 ? task.hours / totalTaskHours : 0;
-  const sliderColor  = done ? "#555" : adjustColor(task.color, (shareOfTasks - 1) * 15, (shareOfTasks - 1) * 55);
+  // Dominant task = most hours → 100% saturation. Others scaled relative to it.
+  const maxTaskHours = tasks.reduce((m, t) => Math.max(m, t.hours), 0);
+  const dominanceRatio = maxTaskHours > 0 ? task.hours / maxTaskHours : 1;
+  const sliderColor  = done ? "#555" : adjustColor(task.color, (dominanceRatio - 1) * 15, (dominanceRatio - 1) * 55);
 
   return (
     <div
@@ -1031,6 +1079,7 @@ function App() {
   useEffect(() => {
     if (longDragIdx === null) return;
     const onMove = e => {
+      if (e.cancelable) e.preventDefault();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       setDragPos({ x: clientX, y: clientY });
@@ -1049,11 +1098,16 @@ function App() {
       }
       setLongDragIdx(null); setDragOver(null);
     };
-    window.addEventListener("pointermove", onMove, { passive: true });
+    // Lock page scroll while dragging
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup",   onUp);
-    window.addEventListener("touchmove",   onMove, { passive: true });
+    window.addEventListener("touchmove",   onMove, { passive: false });
     window.addEventListener("touchend",    onUp);
     return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup",   onUp);
       window.removeEventListener("touchmove",   onMove);
@@ -1148,17 +1202,6 @@ function App() {
                   </div>
                 );
               })}
-              {remaining > FLOAT_TOLERANCE && (
-                <div style={{marginBottom:7, opacity:0.5}}>
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:3}}>
-                    <span style={{fontSize:10, color:T.textMuted, fontFamily:"'Space Mono',monospace"}}>free</span>
-                    <span style={{fontSize:9, color:T.textMuted, fontFamily:"'Space Mono',monospace"}}>{formatHours(remaining)}</span>
-                  </div>
-                  <div style={{height:4, borderRadius:3, background:T.bgSlider, overflow:"hidden"}}>
-                    <div style={{height:"100%", width:`${Math.max(2,(remaining/dayLen)*100)}%`, borderRadius:3, background:T.borderMid, transition:"width 0.3s"}}/>
-                  </div>
-                </div>
-              )}
               {tasks.length === 0 && <span style={{fontSize:10, color:T.textFaint}}>No tasks yet</span>}
               <button
                 onClick={() => {
@@ -1326,7 +1369,7 @@ function App() {
               return (
                 <div key={t.id} data-taskcard={i}
                   style={{opacity: isFloating?0.25:1, transform: isOver?"translateY(-3px) scale(1.01)":isFloating?"scale(0.97)":"none", transition:"opacity 0.2s,transform 0.15s", filter: isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none", borderRadius:12}}>
-                  <TaskCard task={t} stepMinutes={step} dayLen={dayLen} totalTaskHours={total} T={T}
+                  <TaskCard task={t} stepMinutes={step} dayLen={dayLen} tasks={tasks} T={T}
                     onChange={patch => dispatch({ type: "UPD_TASK", id: t.id, patch })}
                     onDelete={() => dispatch({ type: "DEL_TASK", id: t.id })}
                     onEdit={() => setEditTask({ ...t })}
