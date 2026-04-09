@@ -15,47 +15,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-/* ── Reset & base ─────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root { --brightness: 1; --contrast: 1; }
 html, body { min-height: 100dvh; background: #1c1c1e; color: #f5f5f5; transition: background 0.25s; overscroll-behavior-y: none; }
-
-/* ── Form elements ────────────────────────────────────────────────────────── */
 textarea, input { outline: none; -webkit-appearance: none; appearance: none; }
 button { -webkit-appearance: none; appearance: none; touch-action: manipulation; cursor: pointer; }
-input[type="text"], input[type="color"], textarea { font-size: 16px !important; } /* prevent iOS zoom */
-
-/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+input[type="text"], input[type="color"], textarea { font-size: 16px !important; }
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-thumb { border-radius: 2px; background: #444; }
-
-/* ── Animations ───────────────────────────────────────────────────────────── */
-@keyframes slideIn  { from { opacity: 0; transform: translateY(-8px);               } to { opacity: 1; transform: translateY(0);            } }
-@keyframes toastIn  { from { opacity: 0; transform: translateY(12px);               } to { opacity: 1; transform: translateY(0);            } }
-@keyframes fadeUp   { from { opacity: 0; transform: translateY(20px);               } to { opacity: 1; transform: translateY(0);            } }
-@keyframes fadeIn   { from { opacity: 0;                                             } to { opacity: 1;                                      } }
-@keyframes floatIn  { from { opacity: 0; transform: rotate(-1.5deg) scale(0.9);     } to { opacity: 1; transform: rotate(-1.5deg) scale(1.04); } }
-
-/* ── Modal ────────────────────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
-  display: flex; align-items: flex-end; justify-content: center;
-  animation: fadeIn 0.15s ease; backdrop-filter: blur(4px);
-}
-.modal-sheet { width: 100%; max-width: 520px; animation: fadeUp 0.22s ease; }
-
-/* ── Layout ───────────────────────────────────────────────────────────────── */
-.sticky-header { position: sticky; top: 0; left: 0; width: 100%; z-index: 20; }
-
-/* ── Responsive breakpoints ───────────────────────────────────────────────── */
-@media (min-width: 600px) {
-  .main-wrap     { max-width: 600px !important; }
-  .modal-overlay { align-items: center; }
-  .modal-sheet   { border-radius: 16px !important; max-width: 460px; }
-}
-@media (min-width: 900px) {
-  .main-wrap { max-width: 720px !important; }
-}
+@keyframes slideIn { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:translateY(0) } }
+@keyframes toastIn { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeUp  { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+@keyframes floatIn { from { opacity:0; transform:rotate(-1.5deg) scale(0.9) } to { opacity:1; transform:rotate(-1.5deg) scale(1.04) } }
+@keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; display:flex; align-items:flex-end; justify-content:center; animation:fadeIn 0.15s ease; backdrop-filter:blur(4px); }
+.modal-sheet { width:100%; max-width:520px; animation:fadeUp 0.22s ease; }
+.sticky-header { position:sticky; top:0; left:0; width:100%; z-index:20; }
+@media (min-width:600px) { .main-wrap { max-width:600px !important; } .modal-overlay { align-items:center; } .modal-sheet { border-radius:16px !important; max-width:460px; } }
+@media (min-width:900px) { .main-wrap { max-width:720px !important; } }
 </style>
 </head>
 <body style="background:#1c1c1e">
@@ -63,906 +40,728 @@ input[type="text"], input[type="color"], textarea { font-size: 16px !important; 
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback, useReducer } = React;
 
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 1 — CONSTANTS
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 const STORAGE_KEY = "sliders_data";
-
-const PALETTE = [
-  "#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF",
-  "#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784",
-  "#64B5F6","#FFD54F","#A1887F","#90A4AE",
-];
-
-const STEPS = [
-  { l: "5m",  m: 5  },
-  { l: "10m", m: 10 },
-  { l: "15m", m: 15 },
-  { l: "30m", m: 30 },
-];
-
-const DARK = {
-  bg: "#1c1c1e", bgCard: "#2a2a2e", bgInput: "#323236", bgSlider: "#484850",
-  border: "#505058", borderMid: "#626268",
-  text: "#ffffff", textSub: "#e8e8e8", textMuted: "#c0c0c0", textDim: "#a0a0a0", textFaint: "#888890",
-  donutFree: "#3a3a3e", tc: "#1c1c1e",
-};
-
-const LIGHT = {
-  bg: "#f4f3ef", bgCard: "#eceae4", bgInput: "#e4e2db", bgSlider: "#d8d6cf",
-  border: "#cac8c1", borderMid: "#bbb9b2",
-  text: "#1a1a1a", textSub: "#2e2e2e", textMuted: "#555", textDim: "#777", textFaint: "#999",
-  donutFree: "#d8d6cf", tc: "#f4f3ef",
-};
-
+const PALETTE = ["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
+const STEPS = [{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30}];
+const DARK  = { bg:"#1c1c1e", bgCard:"#2a2a2e", bgInput:"#323236", bgSlider:"#484850", border:"#505058", borderMid:"#626268", text:"#ffffff", textSub:"#e8e8e8", textMuted:"#c0c0c0", textDim:"#a0a0a0", textFaint:"#888890", donutFree:"#3a3a3e", tc:"#1c1c1e" };
+const LIGHT = { bg:"#f4f3ef", bgCard:"#eceae4", bgInput:"#e4e2db", bgSlider:"#d8d6cf", border:"#cac8c1", borderMid:"#bbb9b2", text:"#1a1a1a", textSub:"#2e2e2e", textMuted:"#555", textDim:"#777", textFaint:"#999", donutFree:"#d8d6cf", tc:"#f4f3ef" };
 const DEFAULT_TASKS = [
-  { id: 1, name: "Sleep",    hours: 8, originalHours: 8, color: PALETTE[0], locked: false, actual: 0 },
-  { id: 2, name: "Work",     hours: 6, originalHours: 6, color: PALETTE[1], locked: false, actual: 0 },
-  { id: 3, name: "Exercise", hours: 1, originalHours: 1, color: PALETTE[2], locked: false, actual: 0 },
+  { id:1, name:"Sleep",    hours:8, originalHours:8, color:PALETTE[0], locked:false, actual:0 },
+  { id:2, name:"Work",     hours:6, originalHours:6, color:PALETTE[1], locked:false, actual:0 },
+  { id:3, name:"Exercise", hours:1, originalHours:1, color:PALETTE[2], locked:false, actual:0 },
 ];
+const LONG_PRESS_MS = 400, TOAST_MS = 2500, CONFIRM_MS = 3000;
+const LERP_SLIDER = 0.3, LERP_DONUT = 0.22, LERP_RING = 0.22;
+const TOL = 0.001, TOL_SLIDER = 0.0005, TOL_ANGLE = 0.0008;
+const MONO = "'Space Mono',monospace", BEBAS = "'Bebas Neue',sans-serif";
 
-// Timing
-const LONG_PRESS_DELAY_MS = 400;
-const TOAST_DURATION_MS   = 2500;
-const CONFIRM_TIMEOUT_MS  = 3000;
-const SLIDER_LERP_SPEED   = 0.3;
-const DONUT_LERP_SPEED    = 0.22;
-const FLOAT_TOLERANCE     = 0.001;
-const SLIDER_TOLERANCE    = 0.0005;
-const ANGLE_TOLERANCE     = 0.0008;
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 2 — HELPERS
-// Pure functions: no side effects, no React.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/** Format decimal hours as a readable string, e.g. 1.5 → "1h 30m" */
 function formatHours(h) {
-  const totalMinutes = Math.round(h * 60);
-  const hours   = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours   === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
+  const m = Math.round(h * 60), hh = Math.floor(m / 60), mm = m % 60;
+  return hh === 0 ? `${mm}m` : mm === 0 ? `${hh}h` : `${hh}h ${mm}m`;
 }
+const snapToStep = (h, s) => Math.round(h * 60 / s) * s / 60;
+const calcDayLen = (s, e) => e >= s ? e - s : (24 - s) + e;
 
-/** Snap a value in hours to the nearest step boundary. */
-function snapToStep(hours, stepMinutes) {
-  return Math.round(hours * 60 / stepMinutes) * stepMinutes / 60;
-}
+function loadState() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
+function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} }
 
-/** Read and parse app state from localStorage. Returns null on failure. */
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-/** Persist app state to localStorage. Silently ignores quota/security errors. */
-function saveState(state) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-}
-
-/** One-time migration from legacy versioned localStorage keys. */
 function migrateOldData() {
-  const OLD_KEYS = ["sliders_v5", "sliders_v4", "sliders_v3", "sliders_v2", "sliders_v1"];
   try {
     if (localStorage.getItem(STORAGE_KEY)) return;
-    for (const oldKey of OLD_KEYS) {
-      const data = localStorage.getItem(oldKey);
-      if (data) { localStorage.setItem(STORAGE_KEY, data); break; }
+    for (const k of ["sliders_v5","sliders_v4","sliders_v3","sliders_v2","sliders_v1"]) {
+      const d = localStorage.getItem(k);
+      if (d) { localStorage.setItem(STORAGE_KEY, d); break; }
     }
   } catch {}
 }
 
-/**
- * Shrink-only scaling: when the day window shrinks below the sum of task hours,
- * compress tasks proportionally to fit. When the window is larger, do nothing.
- */
-function scaleTasksToTotal(tasks, targetTotal) {
-  if (tasks.length === 0) return tasks;
-  const currentSum = tasks.reduce((sum, t) => sum + (t.hours || 0), 0);
-  if (targetTotal >= currentSum - FLOAT_TOLERANCE) return tasks;
-  if (currentSum <= 0) return tasks;
-  const targetMinutes = Math.round(targetTotal * 60);
-  let assigned = 0;
-  const newMinutes = tasks.map((t, i) => {
-    if (i === tasks.length - 1) return Math.max(0, targetMinutes - assigned);
-    const m = Math.round((t.hours || 0) / currentSum * targetMinutes);
-    assigned += m;
-    return m;
+function scaleTasksToTotal(tasks, target) {
+  if (!tasks.length) return tasks;
+  const sum = tasks.reduce((s, t) => s + (t.hours || 0), 0);
+  if (target >= sum - TOL || sum <= 0) return tasks;
+  const tMin = Math.round(target * 60);
+  let used = 0;
+  const mins = tasks.map((t, i) => {
+    if (i === tasks.length - 1) return Math.max(0, tMin - used);
+    const m = Math.round((t.hours || 0) / sum * tMin); used += m; return m;
   });
-  return tasks.map((t, i) => ({ ...t, hours: Math.max(0, newMinutes[i] / 60) }));
+  return tasks.map((t, i) => ({ ...t, hours: Math.max(0, mins[i] / 60) }));
 }
 
-/** Parse a previously-exported markdown file back into tasks + day window. */
 function parseMD(text) {
-  const tasks = [];
-  let dayStart = null, dayEnd = null;
+  const tasks = []; let dayStart = null, dayEnd = null;
   for (const line of text.split("\n")) {
-    const dayMatch = line.match(/^> Day: (\d+(?:\.\d+)?):(\d+) → (\d+(?:\.\d+)?):(\d+)/);
-    if (dayMatch) {
-      dayStart = parseInt(dayMatch[1]) + (dayMatch[2] === "30" ? 0.5 : 0);
-      dayEnd   = parseInt(dayMatch[3]) + (dayMatch[4] === "30" ? 0.5 : 0);
-    }
-    const taskMatch = line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6})?/);
-    if (taskMatch) {
-      tasks.push({
-        id: Date.now() + Math.random(),
-        name: taskMatch[1].trim(),
-        hours: parseFloat(taskMatch[2]),
-        originalHours: parseFloat(taskMatch[2]),
-        color: taskMatch[3] || PALETTE[tasks.length % PALETTE.length],
-        locked: false, actual: 0,
-      });
-    }
+    const dm = line.match(/^> Day: (\d+(?:\.\d+)?):(\d+) → (\d+(?:\.\d+)?):(\d+)/);
+    if (dm) { dayStart = +dm[1] + (dm[2]==="30"?.5:0); dayEnd = +dm[3] + (dm[4]==="30"?.5:0); }
+    const tm = line.match(/^## (.+?) \[(\d+(?:\.\d+)?)h\] (#[0-9a-fA-F]{6})?/);
+    if (tm) tasks.push({ id: Date.now()+Math.random(), name:tm[1].trim(), hours:+tm[2], originalHours:+tm[2], color:tm[3]||PALETTE[tasks.length%PALETTE.length], locked:false, actual:0 });
   }
   return { tasks, dayStart, dayEnd };
 }
 
-/** Serialize current state to a markdown string for export/backup. */
-function serializeMD(tasks, dayStart = 0, dayEnd = 24) {
-  const dayLength   = dayEnd - dayStart;
-  const total       = tasks.reduce((s, t) => s + t.hours, 0);
-  const unallocated = Math.max(0, dayLength - total);
-  const toTime = h => `${String(Math.floor(h)).padStart(2,"0")}:${h % 1 ? "30" : "00"}`;
-  let out = `# Sliders — Daily Time Allocation\n\n`;
-  out += `> Day: ${toTime(dayStart)} → ${toTime(dayEnd)} (${formatHours(dayLength)})\n`;
-  out += `> Total: ${formatHours(total)} / ${formatHours(dayLength)} | Unallocated: ${formatHours(unallocated)}\n\n---\n\n`;
-  for (const t of tasks) {
-    const pctStr = dayLength > 0 ? ((t.hours / dayLength) * 100).toFixed(1) : "—";
-    out += `## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n`;
-    out += `- Planned: ${formatHours(t.hours)} (${pctStr}%)\n`;
-    out += `- Actual: ${formatHours(t.actual || 0)}\n\n`;
-  }
+function serializeMD(tasks, s=0, e=24) {
+  const dl = calcDayLen(s, e), total = tasks.reduce((a,t)=>a+t.hours,0);
+  const tt = h => `${String(Math.floor(h)).padStart(2,"0")}:${h%1?"30":"00"}`;
+  let out = `# Sliders — Daily Time Allocation\n\n> Day: ${tt(s)} → ${tt(e)} (${formatHours(dl)})\n> Total: ${formatHours(total)} / ${formatHours(dl)} | Unallocated: ${formatHours(Math.max(0,dl-total))}\n\n---\n\n`;
+  for (const t of tasks) out += `## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${formatHours(t.hours)} (${dl>0?((t.hours/dl)*100).toFixed(1):"—"}%)\n- Actual: ${formatHours(t.actual||0)}\n\n`;
   return out + `---\n_Generated by Sliders App_\n`;
 }
 
-// ── Colour helpers ────────────────────────────────────────────────────────────
+// ── Sync string encode/decode ─────────────────────────────────────────────────
+
+function encodeSyncString(state) {
+  const payload = {
+    tasks: state.tasks,
+    favs: state.favs,
+    step: state.step,
+    dark: state.dark,
+    showTL: state.showTL,
+    dayStart: state.dayStart,
+    dayEnd: state.dayEnd,
+    v: 1,
+    ts: Date.now(),
+  };
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  } catch { return null; }
+}
+
+function decodeSyncString(str) {
+  try {
+    const json = decodeURIComponent(escape(atob(str.trim())));
+    const d = JSON.parse(json);
+    if (!d.tasks || !Array.isArray(d.tasks)) return null;
+    return d;
+  } catch { return null; }
+}
 
 function hexToHsl(hex) {
-  let r = parseInt(hex.slice(1,3),16)/255;
-  let g = parseInt(hex.slice(3,5),16)/255;
-  let b = parseInt(hex.slice(5,7),16)/255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b);
-  let h, s, l = (max+min)/2;
-  if (max === min) { h = s = 0; } else {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch(max) {
-      case r: h = ((g-b)/d + (g<b?6:0)) / 6; break;
-      case g: h = ((b-r)/d + 2) / 6; break;
-      default: h = ((r-g)/d + 4) / 6;
-    }
+  let r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b); let h,s,l=(max+min)/2;
+  if (max===min) { h=s=0; } else {
+    const d=max-min; s=l>.5?d/(2-max-min):d/(max+min);
+    h=max===r?((g-b)/d+(g<b?6:0))/6:max===g?((b-r)/d+2)/6:((r-g)/d+4)/6;
   }
-  return [h*360, s*100, l*100];
+  return [h*360,s*100,l*100];
+}
+function hslToHex(h,s,l) {
+  s/=100; l/=100;
+  const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return "#"+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join("");
+}
+function adjustColor(hex, ld, sd=0) {
+  if (!hex?.startsWith("#") || hex.length<7) return hex;
+  try { const [h,s,l]=hexToHsl(hex); return hslToHex(h,Math.max(0,Math.min(100,s+sd)),Math.max(0,Math.min(100,l+ld))); }
+  catch { return hex; }
 }
 
-function hslToHex(h, s, l) {
-  s /= 100; l /= 100;
-  const k = n => (n + h/30) % 12;
-  const a = s * Math.min(l, 1-l);
-  const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
-  return "#" + [f(0),f(8),f(4)].map(x => Math.round(x*255).toString(16).padStart(2,"0")).join("");
-}
-
-/** Adjust a hex colour's lightness (and optionally saturation). */
-function adjustColor(hex, lightnessDelta, saturationDelta = 0) {
-  if (!hex || !hex.startsWith("#") || hex.length < 7) return hex;
-  try {
-    const [h, s, l] = hexToHsl(hex);
-    return hslToHex(
-      h,
-      Math.max(0, Math.min(100, s + saturationDelta)),
-      Math.max(0, Math.min(100, l + lightnessDelta)),
-    );
-  } catch { return hex; }
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 3 — STATE  (initState + reducer)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── State ─────────────────────────────────────────────────────────────────────
 
 function initState() {
-  const saved = loadState();
-  return {
-    tasks:    saved?.tasks    ?? DEFAULT_TASKS,
-    favs:     saved?.favs     ?? [],
-    step:     saved?.step     ?? 10,
-    dark:     saved?.dark     ?? true,
-    showTL:   saved?.showTL   ?? false,
-    dayStart: saved?.dayStart ?? 10.5,
-    dayEnd:   saved?.dayEnd   ?? 16,
-  };
+  const s = loadState();
+  return { tasks:s?.tasks??DEFAULT_TASKS, favs:s?.favs??[], step:s?.step??10, dark:s?.dark??true, showTL:s?.showTL??false, dayStart:s?.dayStart??10.5, dayEnd:s?.dayEnd??16 };
 }
 
+const nameLc = n => n.toLowerCase();
+
 function reducer(state, action) {
-  const dayLength = state.dayEnd >= state.dayStart
-    ? state.dayEnd - state.dayStart
-    : (24 - state.dayStart) + state.dayEnd;
+  const dl = calcDayLen(state.dayStart, state.dayEnd);
 
   switch (action.type) {
-
     case "ADD_TASK": {
       const { name, color, hours } = action;
-      const matchingFav   = state.favs.find(f => f.name.toLowerCase() === name.toLowerCase());
-      const totalAllocated = state.tasks.reduce((s, t) => s + t.hours, 0);
-      const remaining     = Math.max(0, dayLength - totalAllocated);
-      const rawHours      = hours !== undefined ? hours
-                          : matchingFav ? matchingFav.hours
-                          : snapToStep(Math.min(state.step / 60, remaining), state.step);
-      const clampedHours  = Math.max(0, Math.min(rawHours, remaining || state.step / 60));
-      const resolvedColor = color || matchingFav?.color || PALETTE[state.tasks.length % PALETTE.length];
-      return {
-        ...state,
-        tasks: [...state.tasks, {
-          id: Date.now(), name, hours: clampedHours, originalHours: clampedHours,
-          color: resolvedColor, locked: false, actual: 0,
-        }],
-      };
+      const fav = state.favs.find(f => nameLc(f.name)===nameLc(name));
+      const rem = Math.max(0, dl - state.tasks.reduce((s,t)=>s+t.hours,0));
+      const h = Math.max(0, Math.min(hours??fav?.hours??snapToStep(Math.min(state.step/60,rem),state.step), rem||state.step/60));
+      return { ...state, tasks: [...state.tasks, { id:Date.now(), name, hours:h, originalHours:h, color:color||fav?.color||PALETTE[state.tasks.length%PALETTE.length], locked:false, actual:0 }] };
     }
-
     case "UPD_TASK": {
-      const updatedTasks = state.tasks.map(t => {
-        if (t.id !== action.id) return t;
-        const updated = { ...t, ...action.patch };
-        // Keep originalHours in sync when user manually moves a slider
-        if (action.patch.hours !== undefined) updated.originalHours = action.patch.hours;
-        return updated;
+      const orig = state.tasks.find(t=>t.id===action.id);
+      const tasks = state.tasks.map(t => {
+        if (t.id!==action.id) return t;
+        const u = {...t,...action.patch};
+        if (action.patch.hours!==undefined) u.originalHours = action.patch.hours;
+        return u;
       });
-      // Keep favourites in sync when hours or colour changes
-      let updatedFavs = state.favs;
-      if (action.patch.hours !== undefined || action.patch.color !== undefined) {
-        const originalTask = state.tasks.find(t => t.id === action.id);
-        if (originalTask && state.favs.some(f => f.name.toLowerCase() === originalTask.name.toLowerCase())) {
-          updatedFavs = state.favs.map(f =>
-            f.name.toLowerCase() === originalTask.name.toLowerCase()
-              ? { ...f, ...(action.patch.hours !== undefined && { hours: action.patch.hours }),
-                        ...(action.patch.color !== undefined && { color: action.patch.color }) }
-              : f
-          );
-        }
-      }
-      return { ...state, tasks: updatedTasks, favs: updatedFavs };
+      let favs = state.favs;
+      if ((action.patch.hours!==undefined||action.patch.color!==undefined) && orig && favs.some(f=>nameLc(f.name)===nameLc(orig.name)))
+        favs = favs.map(f => nameLc(f.name)===nameLc(orig.name) ? {...f,...(action.patch.hours!==undefined&&{hours:action.patch.hours}),...(action.patch.color!==undefined&&{color:action.patch.color})} : f);
+      return { ...state, tasks, favs };
     }
-
-    case "DEL_TASK":
-      return { ...state, tasks: state.tasks.filter(t => t.id !== action.id) };
-
-    case "SET_TASKS":
-      return { ...state, tasks: action.tasks };
-
+    case "DEL_TASK":   return { ...state, tasks: state.tasks.filter(t=>t.id!==action.id) };
+    case "SET_TASKS":  return { ...state, tasks: action.tasks };
     case "ADD_FAV": {
       const t = action.task;
-      if (state.favs.some(f => f.name.toLowerCase() === t.name.toLowerCase())) return state;
-      return { ...state, favs: [...state.favs, { name: t.name, hours: t.hours, color: t.color }] };
+      if (state.favs.some(f=>nameLc(f.name)===nameLc(t.name))) return state;
+      return { ...state, favs: [...state.favs, {name:t.name,hours:t.hours,color:t.color}] };
     }
-
-    case "DEL_FAV":
-      return { ...state, favs: state.favs.filter(f => f.name.toLowerCase() !== action.name.toLowerCase()) };
-
+    case "DEL_FAV":    return { ...state, favs: state.favs.filter(f=>nameLc(f.name)!==nameLc(action.name)) };
     case "DISTRIBUTE": {
-      const unlocked = state.tasks.filter(t => !t.locked);
+      const unlocked = state.tasks.filter(t=>!t.locked);
       if (!unlocked.length) return state;
-      const lockedHours = state.tasks.filter(t => t.locked).reduce((s, t) => s + t.hours, 0);
-      const hoursEach   = snapToStep((dayLength - lockedHours) / unlocked.length, state.step);
-      return { ...state, tasks: state.tasks.map(t => t.locked ? t : { ...t, hours: hoursEach, originalHours: hoursEach }) };
+      const h = snapToStep((dl - state.tasks.filter(t=>t.locked).reduce((s,t)=>s+t.hours,0)) / unlocked.length, state.step);
+      return { ...state, tasks: state.tasks.map(t=>t.locked?t:{...t,hours:h,originalHours:h}) };
     }
-
     case "SET_DAY_WINDOW": {
       const { start, end } = action;
-      // Day length wraps around midnight if end < start
-      const newLength = end >= start ? end - start : (24 - start) + end;
-      if (newLength < 0.5) return state;
-      const oldLength = state.dayEnd >= state.dayStart
-        ? state.dayEnd - state.dayStart
-        : (24 - state.dayStart) + state.dayEnd;
-      const restored = newLength > oldLength
-        ? state.tasks.map(t => ({ ...t, hours: t.originalHours ?? t.hours }))
-        : state.tasks;
-      return { ...state, dayStart: start, dayEnd: end, tasks: scaleTasksToTotal(restored, newLength) };
+      const nl = calcDayLen(start, end);
+      if (nl < 0.5) return state;
+      const restored = nl > dl ? state.tasks.map(t=>({...t,hours:t.originalHours??t.hours})) : state.tasks;
+      return { ...state, dayStart:start, dayEnd:end, tasks:scaleTasksToTotal(restored,nl) };
     }
-
     case "SET_DAY_START": {
-      const { start } = action;
-      const newLength = state.dayEnd >= start ? state.dayEnd - start : (24 - start) + state.dayEnd;
-      if (newLength < 0.5) return state;
-      return { ...state, dayStart: start, tasks: scaleTasksToTotal(state.tasks, newLength) };
+      const nl = calcDayLen(action.start, state.dayEnd);
+      if (nl < 0.5) return state;
+      return { ...state, dayStart:action.start, tasks:scaleTasksToTotal(state.tasks,nl) };
     }
-
     case "REORDER_TASKS": {
-      const { from, to } = action;
       const tasks = [...state.tasks];
-      const [moved] = tasks.splice(from, 1);
-      tasks.splice(to, 0, moved);
+      tasks.splice(action.to, 0, tasks.splice(action.from, 1)[0]);
       return { ...state, tasks };
     }
-
-    case "SET_STEP":    return { ...state, step:   action.step };
-    case "SET_DARK":    return { ...state, dark:   action.dark };
-    case "SET_SHOW_TL": return { ...state, showTL: action.v   };
-
+    case "SET_STEP":    return { ...state, step:action.step };
+    case "SET_DARK":    return { ...state, dark:action.dark };
+    case "SET_SHOW_TL": return { ...state, showTL:action.v };
+    case "FULL_REPLACE": {
+      const d = action.data;
+      return { ...state, tasks:d.tasks, favs:d.favs??state.favs, step:d.step??state.step, dark:d.dark??state.dark, showTL:d.showTL??state.showTL, dayStart:d.dayStart??state.dayStart, dayEnd:d.dayEnd??state.dayEnd };
+    }
+    case "MERGE_IMPORT": {
+      const d = action.data;
+      const existingTaskNames = new Set(state.tasks.map(t=>nameLc(t.name)));
+      const newTasks = (d.tasks||[]).filter(t=>!existingTaskNames.has(nameLc(t.name)));
+      const existingFavNames = new Set(state.favs.map(f=>nameLc(f.name)));
+      const newFavs = (d.favs||[]).filter(f=>!existingFavNames.has(nameLc(f.name)));
+      return { ...state, tasks:[...state.tasks,...newTasks], favs:[...state.favs,...newFavs] };
+    }
     default: return state;
   }
 }
 
+// ── Ring slider ───────────────────────────────────────────────────────────────
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 4 — COMPONENT: CircularDaySlider
-// Ring slider with two drag handles (start = teal, end = orange).
-// Hours 0–24 map to 0–360°, starting from the top (−90°).
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const RING_SIZE=220, RING_CX=110, RING_CY=110, RING_RADIUS=88, RING_THUMB=9, RING_STROKE=10;
+const RING_START_COLOR="#4ECDC4", RING_END_COLOR="#FF6B2B";
+const FULL_CIRCLE_PATH = `M ${RING_CX} ${RING_CY-RING_RADIUS} A ${RING_RADIUS} ${RING_RADIUS} 0 1 1 ${RING_CX-0.001} ${RING_CY-RING_RADIUS}`;
 
-const RING_SIZE   = 220;
-const RING_CX     = 110;
-const RING_CY     = 110;
-const RING_RADIUS = 88;
-const RING_THUMB  = 9;
-const RING_STROKE = 10;
-const RING_START_COLOR = "#4ECDC4";
-const RING_END_COLOR   = "#FF6B2B";
-
-const FULL_CIRCLE_PATH = `M ${RING_CX} ${RING_CY - RING_RADIUS} A ${RING_RADIUS} ${RING_RADIUS} 0 1 1 ${RING_CX - 0.001} ${RING_CY - RING_RADIUS}`;
-
-function hourToAngle(h) { return (h / 24) * 2 * Math.PI - Math.PI / 2; }
-function angleToHour(a) {
-  return (((a + Math.PI / 2) / (2 * Math.PI) * 24) % 24 + 24) % 24;
-}
-function angleToHourSnapped(a) { return Math.round(angleToHour(a) * 2) / 2; }
-// Shortest delta from angle `from` to `to`, in (-π, π]
+const hourToAngle = h => (h/24)*2*Math.PI - Math.PI/2;
+const angleToHour = a => (((a+Math.PI/2)/(2*Math.PI)*24)%24+24)%24;
+const angleToHourSnapped = a => Math.round(angleToHour(a)*2)/2;
 function angleDelta(from, to) {
-  let d = ((to - from) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-  if (d > Math.PI) d -= 2 * Math.PI;
-  return d;
+  let d = ((to-from)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+  if (d>Math.PI) d-=2*Math.PI; return d;
 }
 function ringArcPath(a1, a2) {
-  let span = ((a2 - a1) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-  if (span < 0.001) span = 2 * Math.PI;
-  const large = span > Math.PI ? 1 : 0;
-  const x1 = RING_CX + RING_RADIUS * Math.cos(a1), y1 = RING_CY + RING_RADIUS * Math.sin(a1);
-  const x2 = RING_CX + RING_RADIUS * Math.cos(a2), y2 = RING_CY + RING_RADIUS * Math.sin(a2);
+  let span = ((a2-a1)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+  if (span<0.001) span=2*Math.PI;
+  const large=span>Math.PI?1:0, x1=RING_CX+RING_RADIUS*Math.cos(a1), y1=RING_CY+RING_RADIUS*Math.sin(a1), x2=RING_CX+RING_RADIUS*Math.cos(a2), y2=RING_CY+RING_RADIUS*Math.sin(a2);
   return `M ${x1} ${y1} A ${RING_RADIUS} ${RING_RADIUS} 0 ${large} 1 ${x2} ${y2}`;
 }
 
 function RingTimeLabel({ hour, angleRad, color }) {
-  const labelR = RING_RADIUS + 22;
-  const lx = RING_CX + labelR * Math.cos(angleRad);
-  const ly = RING_CY + labelR * Math.sin(angleRad);
-  const anchor = lx < RING_CX - 10 ? "end" : lx > RING_CX + 10 ? "start" : "middle";
-  const label  = `${String(Math.floor(hour)).padStart(2,"0")}:${hour % 1 ? "30" : "00"}`;
-  return (
-    <text x={lx} y={ly+4} textAnchor={anchor} fill={color} fontSize={9}
-      fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>
-      {label}
-    </text>
-  );
+  const R=RING_RADIUS+22, lx=RING_CX+R*Math.cos(angleRad), ly=RING_CY+R*Math.sin(angleRad);
+  return <text x={lx} y={ly+4} textAnchor={lx<RING_CX-10?"end":lx>RING_CX+10?"start":"middle"} fill={color} fontSize={9} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{String(Math.floor(hour)).padStart(2,"0")}:{hour%1?"30":"00"}</text>;
 }
 
 function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
-  const svgRef     = useRef();
-  const dragging   = useRef(null); // 'start' | 'end' | null
+  const svgRef=useRef(), dragging=useRef(null);
+  // FIX: initialize display angles directly from props, no animation on first render
+  const dispStartA=useRef(null), dispEndA=useRef(null);
+  const tgtStartA=useRef(hourToAngle(dayStart)), tgtEndA=useRef(hourToAngle(dayEnd));
+  const animRaf=useRef(null);
+  const [,tick]=useReducer(x=>x+1,0);
 
-  // Display angles for smooth rendering — kept in a continuous unwrapped space.
-  // We never reset these; we only nudge them toward the target each frame.
-  const dispStartA = useRef(hourToAngle(dayStart));
-  const dispEndA   = useRef(hourToAngle(dayEnd));
-  // Target angles (updated immediately on drag or prop change)
-  const tgtStartA  = useRef(hourToAngle(dayStart));
-  const tgtEndA    = useRef(hourToAngle(dayEnd));
-  const animRaf    = useRef(null);
-  const [, tick]   = useReducer(x => x + 1, 0);
-
-  const RING_LERP = 0.22;
-  const RING_TOL  = 0.0005;
+  // init display angles immediately on first render
+  if (dispStartA.current === null) {
+    dispStartA.current = hourToAngle(dayStart);
+    dispEndA.current = hourToAngle(dayEnd);
+  }
 
   function startAnim() {
     if (animRaf.current) return;
     const run = () => {
-      // Use shortest-path delta to avoid wrap-around jumps
-      const dS = angleDelta(dispStartA.current, tgtStartA.current);
-      const dE = angleDelta(dispEndA.current,   tgtEndA.current);
-      const more = Math.abs(dS) > RING_TOL || Math.abs(dE) > RING_TOL;
-      dispStartA.current += dS * RING_LERP;
-      dispEndA.current   += dE * RING_LERP;
-      if (!more) {
-        dispStartA.current = tgtStartA.current;
-        dispEndA.current   = tgtEndA.current;
-        animRaf.current    = null;
-        tick();
-        return;
+      const dS=angleDelta(dispStartA.current,tgtStartA.current), dE=angleDelta(dispEndA.current,tgtEndA.current);
+      dispStartA.current+=dS*LERP_RING; dispEndA.current+=dE*LERP_RING;
+      if (Math.abs(dS)<TOL_SLIDER && Math.abs(dE)<TOL_SLIDER) {
+        dispStartA.current=tgtStartA.current; dispEndA.current=tgtEndA.current;
+        animRaf.current=null; tick(); return;
       }
-      tick();
-      animRaf.current = requestAnimationFrame(run);
+      tick(); animRaf.current=requestAnimationFrame(run);
     };
-    animRaf.current = requestAnimationFrame(run);
+    animRaf.current=requestAnimationFrame(run);
   }
 
-  // When props change (and we're not dragging), update targets and animate
   useEffect(() => {
-    if (!dragging.current) {
-      tgtStartA.current = hourToAngle(dayStart);
-      tgtEndA.current   = hourToAngle(dayEnd);
-      startAnim();
-    }
+    if (!dragging.current) { tgtStartA.current=hourToAngle(dayStart); tgtEndA.current=hourToAngle(dayEnd); startAnim(); }
   }, [dayStart, dayEnd]);
-
   useEffect(() => () => { if (animRaf.current) cancelAnimationFrame(animRaf.current); }, []);
 
-  const dayLen = dayEnd >= dayStart ? dayEnd - dayStart : (24 - dayStart) + dayEnd;
+  const dl = calcDayLen(dayStart, dayEnd);
+  const tp = a => ({ x:RING_CX+RING_RADIUS*Math.cos(a), y:RING_CY+RING_RADIUS*Math.sin(a) });
+  const tS=tp(dispStartA.current), tE=tp(dispEndA.current);
 
-  const thumbPos = a => ({ x: RING_CX + RING_RADIUS * Math.cos(a), y: RING_CY + RING_RADIUS * Math.sin(a) });
-  const tStart   = thumbPos(dispStartA.current);
-  const tEnd     = thumbPos(dispEndA.current);
-
-  const getAngleFromEvent = e => {
-    const rect    = svgRef.current.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) / rect.width  * RING_SIZE - RING_CX;
-    const y = (clientY - rect.top)  / rect.height * RING_SIZE - RING_CY;
-    return Math.atan2(y, x);
+  const getAngle = e => {
+    const rect=svgRef.current.getBoundingClientRect(), cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    return Math.atan2((cy-rect.top)/rect.height*RING_SIZE-RING_CY, (cx-rect.left)/rect.width*RING_SIZE-RING_CX);
   };
 
-  const onPointerDown = which => e => {
-    e.preventDefault(); e.stopPropagation();
-    dragging.current = which;
-    svgRef.current.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = e => {
+  const onDown = which => e => { e.preventDefault(); e.stopPropagation(); dragging.current=which; svgRef.current.setPointerCapture(e.pointerId); };
+  const onMove = e => {
     if (!dragging.current) return;
-    const rawA = getAngleFromEvent(e);
-    const h    = angleToHourSnapped(rawA);
-    if (dragging.current === "start") {
-      tgtStartA.current = rawA; // raw — no snap jitter on screen
-      startAnim();
-      onChange(h, dayEnd);
-    } else {
-      tgtEndA.current = rawA;
-      startAnim();
-      onChange(dayStart, h);
-    }
+    const rawA=getAngle(e), h=angleToHourSnapped(rawA);
+    if (dragging.current==="start") { tgtStartA.current=rawA; startAnim(); onChange(h,dayEnd); }
+    else { tgtEndA.current=rawA; startAnim(); onChange(dayStart,h); }
   };
+  const onUp = () => { dragging.current=null; tgtStartA.current=hourToAngle(dayStart); tgtEndA.current=hourToAngle(dayEnd); startAnim(); };
 
-  const onPointerUp = () => {
-    dragging.current = null;
-    // Snap visual to committed prop values
-    tgtStartA.current = hourToAngle(dayStart);
-    tgtEndA.current   = hourToAngle(dayEnd);
-    startAnim();
-  };
+  const arcOp = 0.2+0.8*Math.max(0,Math.min(1,dl/24));
+  const timeRange = `${String(Math.floor(dayStart)).padStart(2,"0")}:${dayStart%1?"30":"00"}–${String(Math.floor(dayEnd)).padStart(2,"0")}:${dayEnd%1?"30":"00"}`;
 
-  const arcOpacity     = 0.2 + 0.8 * Math.max(0, Math.min(1, dayLen / 24));
-  const centerTimeRange = `${String(Math.floor(dayStart)).padStart(2,"0")}:${dayStart%1?"30":"00"}–${String(Math.floor(dayEnd)).padStart(2,"0")}:${dayEnd%1?"30":"00"}`;
+  const Handle = ({ pos, color, which }) => <>
+    <circle cx={pos.x} cy={pos.y} r={RING_THUMB+4} fill="transparent" style={{cursor:"grab"}} onPointerDown={onDown(which)}/>
+    <circle cx={pos.x} cy={pos.y} r={RING_THUMB} fill={color} stroke={T.bg} strokeWidth={2} style={{cursor:"grab",filter:`drop-shadow(0 0 4px ${color}88)`}} onPointerDown={onDown(which)}/>
+  </>;
 
   return (
-    <div style={{position:"relative", width:RING_SIZE, height:RING_SIZE, flexShrink:0}}>
-      <svg ref={svgRef} width={RING_SIZE} height={RING_SIZE}
-        style={{display:"block", touchAction:"none", userSelect:"none", overflow:"visible"}}
-        onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-
-        {/* Background ring */}
+    <div style={{position:"relative",width:RING_SIZE,height:RING_SIZE,flexShrink:0}}>
+      <svg ref={svgRef} width={RING_SIZE} height={RING_SIZE} style={{display:"block",touchAction:"none",userSelect:"none",overflow:"visible"}} onPointerMove={onMove} onPointerUp={onUp}>
         <path d={FULL_CIRCLE_PATH} fill="none" stroke={T.bgSlider} strokeWidth={RING_STROKE} strokeLinecap="round"/>
-
-        {/* Active arc */}
-        <path d={ringArcPath(dispStartA.current, dispEndA.current)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE}
-          strokeLinecap="round" opacity={arcOpacity} style={{transition:"opacity 0.3s"}}/>
-
-        {/* Center labels */}
-        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={13}
-          fontFamily="'Space Mono',monospace" fontWeight="bold">{formatHours(dayLen)}</text>
-        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={9}
-          fontFamily="'Space Mono',monospace">{centerTimeRange}</text>
-
-        {/* Start handle (teal) */}
-        <circle cx={tStart.x} cy={tStart.y} r={RING_THUMB+4} fill="transparent"
-          style={{cursor:"grab"}} onPointerDown={onPointerDown("start")}/>
-        <circle cx={tStart.x} cy={tStart.y} r={RING_THUMB} fill={RING_START_COLOR} stroke={T.bg} strokeWidth={2}
-          style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_START_COLOR}88)`}}
-          onPointerDown={onPointerDown("start")}/>
+        <path d={ringArcPath(dispStartA.current,dispEndA.current)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE} strokeLinecap="round" opacity={arcOp} style={{transition:"opacity 0.3s"}}/>
+        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={13} fontFamily={MONO} fontWeight="bold">{formatHours(dl)}</text>
+        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={9} fontFamily={MONO}>{timeRange}</text>
+        <Handle pos={tS} color={RING_START_COLOR} which="start"/>
         <RingTimeLabel hour={dayStart} angleRad={dispStartA.current} color={RING_START_COLOR}/>
-
-        {/* End handle (orange) */}
-        <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB+4} fill="transparent"
-          style={{cursor:"grab"}} onPointerDown={onPointerDown("end")}/>
-        <circle cx={tEnd.x} cy={tEnd.y} r={RING_THUMB} fill={RING_END_COLOR} stroke={T.bg} strokeWidth={2}
-          style={{cursor:"grab", filter:`drop-shadow(0 0 4px ${RING_END_COLOR}88)`}}
-          onPointerDown={onPointerDown("end")}/>
+        <Handle pos={tE} color={RING_END_COLOR} which="end"/>
         <RingTimeLabel hour={dayEnd} angleRad={dispEndA.current} color={RING_END_COLOR}/>
       </svg>
     </div>
   );
 }
 
+// ── Donut ─────────────────────────────────────────────────────────────────────
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 5 — COMPONENT: Donut
-// Pie/donut chart with animated segments and drag-to-reorder.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const DONUT_SIZE=220, DONUT_R=72, DONUT_CX=110, DONUT_CY=110, DONUT_INNER=45;
 
-const DONUT_SIZE  = 220;
-const DONUT_R     = 72;
-const DONUT_CX    = 110;
-const DONUT_CY    = 110;
-const DONUT_INNER = 45;
+function buildSegPath(sa, sw) {
+  const x1=DONUT_CX+DONUT_R*Math.cos(sa), y1=DONUT_CY+DONUT_R*Math.sin(sa);
+  const x2=DONUT_CX+DONUT_R*Math.cos(sa+sw), y2=DONUT_CY+DONUT_R*Math.sin(sa+sw);
+  return `M ${DONUT_CX} ${DONUT_CY} L ${x1} ${y1} A ${DONUT_R} ${DONUT_R} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
+}
 
-function buildSegmentPath(startAngle, sweep) {
-  const x1 = DONUT_CX + DONUT_R * Math.cos(startAngle),           y1 = DONUT_CY + DONUT_R * Math.sin(startAngle);
-  const x2 = DONUT_CX + DONUT_R * Math.cos(startAngle + sweep),   y2 = DONUT_CY + DONUT_R * Math.sin(startAngle + sweep);
-  return `M ${DONUT_CX} ${DONUT_CY} L ${x1} ${y1} A ${DONUT_R} ${DONUT_R} 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2} ${y2} Z`;
+// Build annular (donut ring) segment path for overlap visualization
+function buildRingPath(sa, sw, rInner, rOuter) {
+  if (sw < 0.001) return "";
+  const large = sw > Math.PI ? 1 : 0;
+  const x1=DONUT_CX+rOuter*Math.cos(sa), y1=DONUT_CY+rOuter*Math.sin(sa);
+  const x2=DONUT_CX+rOuter*Math.cos(sa+sw), y2=DONUT_CY+rOuter*Math.sin(sa+sw);
+  const x3=DONUT_CX+rInner*Math.cos(sa+sw), y3=DONUT_CY+rInner*Math.sin(sa+sw);
+  const x4=DONUT_CX+rInner*Math.cos(sa), y4=DONUT_CY+rInner*Math.sin(sa);
+  return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${large} 0 ${x4} ${y4} Z`;
+}
+
+// Calculate which angular ranges are "overflowed" (tasks beyond dayLen)
+function calcOverflowAngles(tasks, dayLen) {
+  if (dayLen <= 0) return [];
+  const total = tasks.reduce((s,t)=>s+(t.hours||0), 0);
+  if (total <= dayLen + TOL) return [];
+
+  // The overflow starts at angle corresponding to dayLen, continues until total
+  const overflowStart = (dayLen / total) * 2 * Math.PI; // fraction of the full circle that's "valid"
+  // We need to find which segments are partially or fully in overflow
+  const overlapSegs = [];
+  let angle = 0;
+  for (const t of tasks) {
+    const sw = (t.hours / total) * 2 * Math.PI;
+    const segEnd = angle + sw;
+    if (segEnd > overflowStart) {
+      // this segment has some overflow
+      const overStart = Math.max(angle, overflowStart);
+      overlapSegs.push({
+        color: t.color,
+        startFrac: overStart / (2*Math.PI),
+        endFrac: segEnd / (2*Math.PI),
+      });
+    }
+    angle = segEnd;
+  }
+  return overlapSegs;
 }
 
 function Donut({ tasks, T, dayLen, onReorder }) {
-  const total     = tasks.reduce((s, t) => s + t.hours, 0);
-  const unalloc   = Math.max(0, dayLen - total);
-  const allSlices = [...tasks, ...(unalloc > FLOAT_TOLERANCE ? [{ id: "free", hours: unalloc, color: T.donutFree }] : [])];
+  const total=tasks.reduce((s,t)=>s+t.hours,0), unalloc=Math.max(0,dayLen-total);
+  // For display: clamp each task to dayLen proportionally when over
+  const displayTasks = total > dayLen + TOL
+    ? tasks.map(t=>({...t, hours: t.hours * (dayLen/total)}))
+    : tasks;
+  const displayUnalloc = Math.max(0, dayLen - displayTasks.reduce((s,t)=>s+t.hours,0));
+  const allSlices=[...displayTasks,...(displayUnalloc>TOL?[{id:"free",hours:displayUnalloc,color:T.donutFree}]:[])];
 
-  // Global dim: short days fade the whole donut
-  const globalBrightness    = Math.max(0.18, Math.min(1, dayLen / 4));
-  const getSegmentBrightness = hours => {
-    if (dayLen <= 0) return 0.35;
-    return Math.max(0.35, Math.min(1, 0.35 + 0.65 * (hours / dayLen) * allSlices.length));
-  };
+  const gb=Math.max(0.18,Math.min(1,dayLen/4));
+  const segBright=h=>dayLen<=0?.35:Math.max(0.35,Math.min(1,0.35+0.65*(h/dayLen)*allSlices.length));
 
-  const [dragSeg, setDragSeg] = useState(null);
-  const [overSeg, setOverSeg] = useState(null);
-  const longPressRef = useRef(null);
-  const svgRef       = useRef();
-  const wrapRef      = useRef();
+  const [dragSeg,setDragSeg]=useState(null), [overSeg,setOverSeg]=useState(null);
+  const lpRef=useRef(), svgRef=useRef(), wrapRef=useRef();
+  const animA=useRef({}), tgtA=useRef({}), animRaf=useRef(null);
+  const [,rerender]=useReducer(x=>x+1,0);
 
-  // ── Smooth angle animation ─────────────────────────────────────────────────
-  const animAngles   = useRef({});  // {id: {startA, sw}} — current animated state
-  const targetAngles = useRef({});  // {id: {startA, sw}} — target state
-  const animRaf      = useRef(null);
-  const [, forceRender] = useReducer(x => x + 1, 0);
-
-  const computeTargets = useCallback(() => {
-    const targets = {};
-    let angle = -Math.PI / 2;
-    for (const slice of allSlices) {
-      const sweep = (slice.hours / dayLen) * 2 * Math.PI;
-      targets[slice.id] = { startA: angle, sw: Math.max(0, sweep) };
-      angle += sweep;
+  // FIX: init animA immediately to avoid first-frame pop
+  const buildTargets = (slices, dl) => {
+    const targets={};
+    let angle=-Math.PI/2;
+    for (const sl of slices) {
+      const sw = dl > 0 ? (sl.hours/dl)*2*Math.PI : 0;
+      targets[sl.id]={startA:angle,sw:Math.max(0,sw)};
+      angle+=sw;
     }
     return targets;
-  }, [allSlices, dayLen]);
-
-  const lerpAngle = (a, b, t) => a + (b - a) * t;
-
-  const startAnimation = useCallback(() => {
-    if (animRaf.current) return;
-    const run = () => {
-      const target  = targetAngles.current;
-      const current = animAngles.current;
-      let needMore = false;
-      const next = {};
-      for (const id of Object.keys(target)) {
-        const t = target[id];
-        const c = current[id] || { startA: t.startA, sw: t.sw };
-        if (Math.abs(t.startA - c.startA) < ANGLE_TOLERANCE && Math.abs(t.sw - c.sw) < ANGLE_TOLERANCE) {
-          next[id] = { startA: t.startA, sw: t.sw };
-        } else {
-          next[id] = { startA: lerpAngle(c.startA, t.startA, DONUT_LERP_SPEED), sw: lerpAngle(c.sw, t.sw, DONUT_LERP_SPEED) };
-          needMore = true;
-        }
-      }
-      animAngles.current = next;
-      forceRender();
-      animRaf.current = needMore ? requestAnimationFrame(run) : null;
-    };
-    animRaf.current = requestAnimationFrame(run);
-  }, []);
+  };
 
   useEffect(() => {
-    const targets = computeTargets();
-    targetAngles.current = targets;
-    // Seed new segments immediately so they don't animate in from zero
+    const targets = buildTargets(allSlices, dayLen);
+    tgtA.current=targets;
+    // init missing entries without animation
     for (const id of Object.keys(targets)) {
-      if (!animAngles.current[id]) animAngles.current[id] = { ...targets[id] };
+      if (!animA.current[id]) animA.current[id]={...targets[id]};
     }
-    startAnimation();
+    if (animRaf.current) return;
+    const run=()=>{
+      const tgt=tgtA.current, cur=animA.current; let more=false; const next={};
+      for (const id of Object.keys(tgt)) {
+        const t=tgt[id], c=cur[id]||{...t};
+        if (Math.abs(t.startA-c.startA)<TOL_ANGLE && Math.abs(t.sw-c.sw)<TOL_ANGLE) { next[id]={...t}; }
+        else { next[id]={startA:c.startA+(t.startA-c.startA)*LERP_DONUT, sw:c.sw+(t.sw-c.sw)*LERP_DONUT}; more=true; }
+      }
+      animA.current=next; rerender();
+      animRaf.current=more?requestAnimationFrame(run):null;
+    };
+    animRaf.current=requestAnimationFrame(run);
   }, [tasks, dayLen]);
+  useEffect(()=>()=>{if(animRaf.current)cancelAnimationFrame(animRaf.current)},[]);
 
-  useEffect(() => () => { if (animRaf.current) cancelAnimationFrame(animRaf.current); }, []);
-
-  const segs = allSlices.map(slice => {
-    const aState = animAngles.current[slice.id] || targetAngles.current[slice.id];
-    if (!aState || aState.sw < 0.002) return null;
-    return { slice, startA: aState.startA, sw: aState.sw, endA: aState.startA + aState.sw };
+  const segs=allSlices.map(sl=>{
+    const a=animA.current[sl.id]||tgtA.current[sl.id];
+    if (!a||a.sw<0.002) return null;
+    return {slice:sl,startA:a.startA,sw:a.sw,endA:a.startA+a.sw};
   });
 
-  // ── Hit-testing ────────────────────────────────────────────────────────────
-  const getSegIndexFromEvent = e => {
-    const rect = (wrapRef.current || svgRef.current).getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) / rect.width  * DONUT_SIZE - DONUT_CX;
-    const y = (clientY - rect.top)  / rect.height * DONUT_SIZE - DONUT_CY;
-    const dist = Math.sqrt(x*x + y*y);
-    if (dist < DONUT_INNER || dist > DONUT_R + 12) return null;
-    const angle = Math.atan2(y, x);
-    for (let i = 0; i < segs.length; i++) {
-      const seg = segs[i];
-      if (!seg || seg.slice.id === "free") continue;
-      const normA  = ((angle - seg.startA)        % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
-      const normSw = ((seg.endA - seg.startA) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
-      if (normA <= normSw) return i;
+  const getSegIdx=e=>{
+    const rect=(wrapRef.current||svgRef.current).getBoundingClientRect();
+    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    const x=(cx-rect.left)/rect.width*DONUT_SIZE-DONUT_CX, y=(cy-rect.top)/rect.height*DONUT_SIZE-DONUT_CY;
+    const dist=Math.sqrt(x*x+y*y);
+    if (dist<DONUT_INNER||dist>DONUT_R+12) return null;
+    const ang=Math.atan2(y,x);
+    for (let i=0;i<segs.length;i++) {
+      const seg=segs[i]; if (!seg||seg.slice.id==="free") continue;
+      const nA=((ang-seg.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+      const nSw=((seg.endA-seg.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+      if (nA<=nSw) return i;
     }
     return null;
   };
 
-  // ── Pointer handlers ───────────────────────────────────────────────────────
-  const onPointerDown = i => e => {
-    if (allSlices[i].id === "free") return;
-    e.preventDefault();
-    wrapRef.current?.setPointerCapture(e.pointerId);
-    longPressRef.current = setTimeout(() => {
-      try { if (navigator.vibrate) navigator.vibrate([10, 30, 10]); } catch {}
-      setDragSeg(i);
-    }, LONG_PRESS_DELAY_MS);
-  };
+  const onDown=i=>e=>{ if(allSlices[i].id==="free")return; e.preventDefault(); wrapRef.current?.setPointerCapture(e.pointerId); lpRef.current=setTimeout(()=>{ try{if(navigator.vibrate)navigator.vibrate([10,30,10])}catch{} setDragSeg(i); },LONG_PRESS_MS); };
+  const onMove=e=>{ if(dragSeg===null)return; e.preventDefault(); const i=getSegIdx(e); setOverSeg(i!==null&&allSlices[i]?.id!=="free"&&i!==dragSeg?i:null); };
+  const onUp=()=>{ clearTimeout(lpRef.current); if(dragSeg!==null&&overSeg!==null&&overSeg!==dragSeg)onReorder(dragSeg,overSeg); setDragSeg(null);setOverSeg(null); };
+  const onCancel=()=>{ clearTimeout(lpRef.current); setDragSeg(null);setOverSeg(null); };
 
-  const onPointerMove = e => {
-    if (dragSeg === null) return;
-    e.preventDefault();
-    const idx = getSegIndexFromEvent(e);
-    setOverSeg(idx !== null && allSlices[idx]?.id !== "free" && idx !== dragSeg ? idx : null);
-  };
+  // Compute overflow overlay: angle where tasks overflow dayLen
+  const isOver = total > dayLen + TOL;
+  const overflowAngle = isOver ? -Math.PI/2 + (dayLen/total)*2*Math.PI : null;
 
-  const onPointerUp = () => {
-    clearTimeout(longPressRef.current);
-    if (dragSeg !== null && overSeg !== null && overSeg !== dragSeg) onReorder(dragSeg, overSeg);
-    setDragSeg(null); setOverSeg(null);
-  };
-
-  const onPointerCancel = () => {
-    clearTimeout(longPressRef.current);
-    setDragSeg(null); setOverSeg(null);
-  };
+  // unique pattern id
+  const patId = "overflow-hatch";
 
   return (
-    <div ref={wrapRef}
-      style={{position:"absolute", top:0, left:0, width:DONUT_SIZE, height:DONUT_SIZE, pointerEvents: dragSeg !== null ? "auto" : "none"}}
-      onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
-      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE}
-        style={{position:"absolute", top:0, left:0, pointerEvents:"none", touchAction:"none", cursor: dragSeg !== null ? "grabbing" : "default"}}>
+    <div ref={wrapRef} style={{position:"absolute",top:0,left:0,width:DONUT_SIZE,height:DONUT_SIZE,pointerEvents:dragSeg!==null?"auto":"none"}} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}>
+      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} style={{position:"absolute",top:0,left:0,pointerEvents:"none",touchAction:"none",cursor:dragSeg!==null?"grabbing":"default"}}>
+        <defs>
+          {/* Diagonal hatch pattern for overflow */}
+          <pattern id={patId} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,60,60,0.55)" strokeWidth="2.5"/>
+          </pattern>
+          <clipPath id="donut-clip">
+            <path d={`M ${DONUT_CX} ${DONUT_CY} m -${DONUT_R+2} 0 a ${DONUT_R+2} ${DONUT_R+2} 0 1 1 ${(DONUT_R+2)*2} 0 a ${DONUT_R+2} ${DONUT_R+2} 0 1 1 -${(DONUT_R+2)*2} 0 M ${DONUT_CX} ${DONUT_CY} m -${DONUT_INNER} 0 a ${DONUT_INNER} ${DONUT_INNER} 0 1 0 ${DONUT_INNER*2} 0 a ${DONUT_INNER} ${DONUT_INNER} 0 1 0 -${DONUT_INNER*2} 0`} fillRule="evenodd"/>
+          </clipPath>
+        </defs>
 
-        {segs.map((seg, i) => {
+        {segs.map((seg,i)=>{
           if (!seg) return null;
-          const { slice } = seg;
-          const isFree     = slice.id === "free";
-          const isDragging = dragSeg === i;
-          const isOver     = overSeg === i;
-          const scale      = isDragging ? 1.08 : isOver ? 0.94 : 1;
-          const brightness = isFree ? globalBrightness : globalBrightness * getSegmentBrightness(slice.hours);
+          const {slice}=seg, isFree=slice.id==="free", isDrag=dragSeg===i, isOverSeg=overSeg===i;
+          const bright=isFree?gb:gb*segBright(slice.hours);
           return (
-            <g key={slice.id || i}
-              style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`, transform:`scale(${scale})`,
-                transition: dragSeg !== null ? "transform 0.15s ease" : "transform 0.25s ease",
-                cursor: isFree ? "default" : dragSeg !== null ? "grabbing" : "grab",
-                opacity: isDragging ? 1 : (slice.done ? 0.4 : 1) * brightness}}
-              pointerEvents={isFree ? "none" : "auto"}
-              onPointerDown={isFree ? undefined : onPointerDown(i)}>
-              <path
-                d={buildSegmentPath(seg.startA, seg.sw)}
-                fill={isOver ? "#888" : (slice.done ? "#444" : slice.color)}
-                stroke={isDragging ? slice.color : T.bg}
-                strokeWidth={isDragging ? 2.5 : 1.5}
-                style={{filter: isDragging ? `drop-shadow(0 0 6px ${slice.color}88)` : "none",
-                  transition:"fill 0.3s,opacity 0.3s,filter 0.15s"}}/>
+            <g key={slice.id||i} style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`,transform:`scale(${isDrag?1.08:isOverSeg?.94:1})`,transition:dragSeg!==null?"transform 0.15s ease":"transform 0.25s ease",cursor:isFree?"default":dragSeg!==null?"grabbing":"grab",opacity:isDrag?1:(slice.done?.4:1)*bright}} pointerEvents={isFree?"none":"auto"} onPointerDown={isFree?undefined:onDown(i)}>
+              <path d={buildSegPath(seg.startA,seg.sw)} fill={isOverSeg?"#888":(slice.done?"#444":slice.color)} stroke={isDrag?slice.color:T.bg} strokeWidth={isDrag?2.5:1.5} style={{filter:isDrag?`drop-shadow(0 0 6px ${slice.color}88)`:"none",transition:"fill 0.3s,opacity 0.3s,filter 0.15s"}}/>
             </g>
           );
         })}
 
-        {/* Centre hole + labels */}
+        {/* Overflow hatch overlay: covers the portion that exceeds dayLen */}
+        {isOver && overflowAngle !== null && (()=>{
+          // The overflow arc goes from overflowAngle back to -PI/2 (completing the circle)
+          const overStart = overflowAngle;
+          const overEnd = -Math.PI/2 + 2*Math.PI; // = 3PI/2
+          const sw = ((overEnd - overStart) + 2*Math.PI) % (2*Math.PI);
+          if (sw < 0.005) return null;
+          const large = sw > Math.PI ? 1 : 0;
+          const x1o=DONUT_CX+DONUT_R*Math.cos(overStart), y1o=DONUT_CY+DONUT_R*Math.sin(overStart);
+          const x2o=DONUT_CX+DONUT_R*Math.cos(overEnd),   y2o=DONUT_CY+DONUT_R*Math.sin(overEnd);
+          const x1i=DONUT_CX+DONUT_INNER*Math.cos(overEnd),   y1i=DONUT_CY+DONUT_INNER*Math.sin(overEnd);
+          const x2i=DONUT_CX+DONUT_INNER*Math.cos(overStart), y2i=DONUT_CY+DONUT_INNER*Math.sin(overStart);
+          const arcPath = `M ${x1o} ${y1o} A ${DONUT_R} ${DONUT_R} 0 ${large} 1 ${x2o} ${y2o} L ${x1i} ${y1i} A ${DONUT_INNER} ${DONUT_INNER} 0 ${large} 0 ${x2i} ${y2i} Z`;
+          return (
+            <g key="overflow-overlay" style={{pointerEvents:"none"}}>
+              <path d={arcPath} fill={`url(#${patId})`} opacity={0.9}/>
+              {/* Red boundary line at overflow start */}
+              <line
+                x1={DONUT_CX + DONUT_INNER*Math.cos(overflowAngle)}
+                y1={DONUT_CY + DONUT_INNER*Math.sin(overflowAngle)}
+                x2={DONUT_CX + DONUT_R*Math.cos(overflowAngle)}
+                y2={DONUT_CY + DONUT_R*Math.sin(overflowAngle)}
+                stroke="rgba(255,80,80,0.95)" strokeWidth={2} strokeDasharray="3,2"
+              />
+              {/* Small "OVER" label near the boundary */}
+              {(()=>{
+                const labelAngle = overflowAngle + sw/2;
+                const lr = (DONUT_INNER + DONUT_R) / 2;
+                return (
+                  <text
+                    x={DONUT_CX + lr*Math.cos(labelAngle)}
+                    y={DONUT_CY + lr*Math.sin(labelAngle)+3}
+                    textAnchor="middle" fill="rgba(255,100,100,0.95)"
+                    fontSize={7} fontFamily={MONO} fontWeight="bold"
+                    style={{pointerEvents:"none"}}
+                  >OVER</text>
+                );
+              })()}
+            </g>
+          );
+        })()}
+
         <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_INNER} fill={T.bg} style={{pointerEvents:"none"}}/>
-        <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={T.text} fontSize={12}
-          fontFamily="'Space Mono',monospace" fontWeight="bold" style={{pointerEvents:"none"}}>
-          {formatHours(total)}
-        </text>
-        <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle"
-          fill={dragSeg !== null ? "#FF6B2B" : T.textMuted} fontSize={8}
-          fontFamily="'Space Mono',monospace" style={{pointerEvents:"none", transition:"fill 0.2s"}}>
-          {dragSeg !== null ? "swap ↕" : "left"}
-        </text>
+        <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={isOver?"#ff6060":T.text} fontSize={12} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatHours(total)}</text>
+        <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"left"}</text>
       </svg>
     </div>
   );
 }
 
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 6 — COMPONENT: Slider
-// Linear drag slider. Uses direct DOM refs for the fill and thumb so that
-// pointer-move updates skip React re-renders, keeping drags smooth.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Linear slider ─────────────────────────────────────────────────────────────
 
 function Slider({ value, max, color, step, locked, onChange }) {
-  const trackRef   = useRef();
-  const displayRef = useRef(); // fill bar  — updated directly on pointer move
-  const thumbRef   = useRef(); // thumb pos — updated directly on pointer move
-  const isDragging   = useRef(false);
-  const lastSnapped  = useRef(value);
-  const animFrame    = useRef(null);
-  const targetRaw    = useRef(value);
-  const currentRaw   = useRef(value);
+  const trackRef=useRef(), fillRef=useRef(), thumbRef=useRef();
+  const dragging=useRef(false), lastSnap=useRef(value), rafRef=useRef(null), tgtRaw=useRef(value), curRaw=useRef(value);
 
-  const applyPercent = pct => {
-    const p = Math.max(0, Math.min(100, pct));
-    if (displayRef.current) displayRef.current.style.width = p + "%";
-    if (thumbRef.current)   thumbRef.current.style.left   = p + "%";
+  const applyPct=p=>{ p=Math.max(0,Math.min(100,p)); if(fillRef.current)fillRef.current.style.width=p+"%"; if(thumbRef.current)thumbRef.current.style.left=p+"%"; };
+  const animTo=t=>{ tgtRaw.current=t; if(rafRef.current)return;
+    const run=()=>{ const d=tgtRaw.current-curRaw.current; if(Math.abs(d)<TOL_SLIDER){curRaw.current=tgtRaw.current;applyPct(curRaw.current/max*100);rafRef.current=null;return;} curRaw.current+=d*LERP_SLIDER;applyPct(curRaw.current/max*100);rafRef.current=requestAnimationFrame(run); };
+    rafRef.current=requestAnimationFrame(run);
   };
 
-  const animateTo = targetHours => {
-    targetRaw.current = targetHours;
-    if (animFrame.current) return;
-    const run = () => {
-      const diff = targetRaw.current - currentRaw.current;
-      if (Math.abs(diff) < SLIDER_TOLERANCE) {
-        currentRaw.current = targetRaw.current;
-        applyPercent((currentRaw.current / max) * 100);
-        animFrame.current = null;
-        return;
-      }
-      currentRaw.current += diff * SLIDER_LERP_SPEED;
-      applyPercent((currentRaw.current / max) * 100);
-      animFrame.current = requestAnimationFrame(run);
-    };
-    animFrame.current = requestAnimationFrame(run);
-  };
+  useEffect(()=>{animTo(value);},[value,max]);
+  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current)},[]);
 
-  useEffect(() => { animateTo(value); }, [value, max]);
-  useEffect(() => () => { if (animFrame.current) cancelAnimationFrame(animFrame.current); }, []);
+  const getRaw=cx=>{ const r=trackRef.current.getBoundingClientRect(); return Math.max(0,Math.min(1,(cx-r.left)/r.width))*max; };
+  const getSnap=cx=>snapToStep(getRaw(cx),step);
 
-  const getRawHours = useCallback(clientX => {
-    const rect = trackRef.current.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * max;
-  }, [max]);
+  const onDown=e=>{ if(locked)return; e.preventDefault(); dragging.current=true; trackRef.current.setPointerCapture(e.pointerId); const r=getRaw(e.clientX); curRaw.current=r;tgtRaw.current=r;applyPct(r/max*100); const s=getSnap(e.clientX); onChange(s);lastSnap.current=s; };
+  const onMove=e=>{ if(!dragging.current)return; animTo(getRaw(e.clientX)); const s=getSnap(e.clientX); if(s!==lastSnap.current){try{if(navigator.vibrate)navigator.vibrate(4)}catch{} lastSnap.current=s;} onChange(s); };
+  const onUp=e=>{ if(!dragging.current)return; dragging.current=false; const s=getSnap(e.clientX); onChange(s);animTo(s); };
 
-  const getSnappedHours = useCallback(clientX => {
-    return snapToStep(getRawHours(clientX), step);
-  }, [getRawHours, step]);
-
-  const tryHaptic = () => { try { if (navigator.vibrate) navigator.vibrate(4); } catch {} };
-
-  const onPointerDown = e => {
-    if (locked) return;
-    e.preventDefault();
-    isDragging.current = true;
-    trackRef.current.setPointerCapture(e.pointerId);
-    // Instant jump to finger — no lerp on first touch
-    const raw = getRawHours(e.clientX);
-    currentRaw.current = raw; targetRaw.current = raw;
-    applyPercent((raw / max) * 100);
-    const snapped = getSnappedHours(e.clientX);
-    onChange(snapped);
-    lastSnapped.current = snapped;
-  };
-
-  const onPointerMove = e => {
-    if (!isDragging.current) return;
-    animateTo(getRawHours(e.clientX));
-    const snapped = getSnappedHours(e.clientX);
-    if (snapped !== lastSnapped.current) { tryHaptic(); lastSnapped.current = snapped; }
-    onChange(snapped);
-  };
-
-  const onPointerUp = e => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    const snapped = getSnappedHours(e.clientX);
-    onChange(snapped);
-    animateTo(snapped);
-  };
-
-  const initPct = (value / max) * 100;
-
+  const ip=(value/max)*100;
   return (
-    <div ref={trackRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      style={{position:"relative", height:36, borderRadius:8, cursor: locked ? "not-allowed" : "pointer", userSelect:"none", touchAction: locked ? "pan-y" : "none", overflow:"hidden"}}>
-      <div style={{position:"absolute", inset:0, background:"var(--bg-slider)", borderRadius:8}}/>
-      <div ref={displayRef} style={{position:"absolute", left:0, top:0, bottom:0, width:`${initPct}%`, background:`linear-gradient(90deg,${color}55,${color}cc)`, borderRadius:8}}/>
-      <div ref={thumbRef} style={{position:"absolute", left:`${initPct}%`, top:"50%", transform:"translate(-50%,-50%)", width:22, height:28, background: locked ? "#555" : color, borderRadius:5, boxShadow: locked ? "none" : `0 2px 10px ${color}88`, pointerEvents:"none", display:"flex", alignItems:"center", justifyContent:"center", transition:"background 0.2s"}}>
-        {locked
-          ? <span style={{fontSize:9, color:"#fff", opacity:0.7}}>🔒</span>
-          : <div style={{width:2, height:10, background:"rgba(0,0,0,0.25)", borderRadius:1}}/>}
+    <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{position:"relative",height:36,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:locked?"pan-y":"none",overflow:"hidden"}}>
+      <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
+      <div ref={fillRef} style={{position:"absolute",left:0,top:0,bottom:0,width:`${ip}%`,background:`linear-gradient(90deg,${color}55,${color}cc)`,borderRadius:8}}/>
+      <div ref={thumbRef} style={{position:"absolute",left:`${ip}%`,top:"50%",transform:"translate(-50%,-50%)",width:22,height:28,background:locked?"#555":color,borderRadius:5,boxShadow:locked?"none":`0 2px 10px ${color}88`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",transition:"background 0.2s"}}>
+        {locked?<span style={{fontSize:9,color:"#fff",opacity:0.7}}>🔒</span>:<div style={{width:2,height:10,background:"rgba(0,0,0,0.25)",borderRadius:1}}/>}
       </div>
     </div>
   );
 }
 
+// ── Small components ──────────────────────────────────────────────────────────
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 7 — SMALL UI COMPONENTS
-// Btn44, TaskCard, EditModal, Timeline, ThemeToggle, FileBtn
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/** Standard 36×36 touch-target icon button. */
 function Btn44({ onClick, danger, children, title }) {
-  return (
-    <button onClick={onClick} title={title}
-      style={{background:"none", border:"none", width:36, height:36, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, transition:"background 0.15s"}}
-      onTouchStart={e => e.currentTarget.style.background = danger ? "#ff444430" : "rgba(128,128,128,0.15)"}
-      onTouchEnd={e   => e.currentTarget.style.background = "none"}
-      onMouseEnter={e => e.currentTarget.style.background = danger ? "#ff444430" : "rgba(128,128,128,0.15)"}
-      onMouseLeave={e => e.currentTarget.style.background = "none"}
-    >{children}</button>
-  );
+  const bg=danger?"#ff444430":"rgba(128,128,128,0.15)";
+  return <button onClick={onClick} title={title} style={{background:"none",border:"none",width:36,height:36,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"background 0.15s"}} onTouchStart={e=>e.currentTarget.style.background=bg} onTouchEnd={e=>e.currentTarget.style.background="none"} onMouseEnter={e=>e.currentTarget.style.background=bg} onMouseLeave={e=>e.currentTarget.style.background="none"}>{children}</button>;
 }
 
 function TaskCard({ task, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
-  const done = !!task.done;
-  const pct  = dayLen > 0 ? Math.round((task.hours / dayLen) * 100) : 0;
-
-  // Dominant task = most hours → 100% saturation. Others scaled relative to it.
-  const maxTaskHours = tasks.reduce((m, t) => Math.max(m, t.hours), 0);
-  const dominanceRatio = maxTaskHours > 0 ? task.hours / maxTaskHours : 1;
-  const sliderColor  = done ? "#555" : adjustColor(task.color, (dominanceRatio - 1) * 15, (dominanceRatio - 1) * 55);
-
+  const done=!!task.done, pct=dayLen>0?Math.round(task.hours/dayLen*100):0;
+  const maxH=tasks.reduce((m,t)=>Math.max(m,t.hours),0), ratio=maxH>0?task.hours/maxH:1;
+  const sliderColor=done?"#555":adjustColor(task.color,(ratio-1)*15,(ratio-1)*55);
   return (
-    <div
-      style={{background:T.bgCard, border:`1px solid ${done?"#404040":T.border}`, borderRadius:12, padding:"10px 12px 9px", marginBottom:7, transition:"background 0.25s,border 0.25s", userSelect:"none"}}
-      onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd}
-      onContextMenu={e => e.preventDefault()}>
-      <div style={{display:"flex", alignItems:"center", gap:7, marginBottom:8}}>
-        <div style={{cursor:"grab", padding:"0 2px", color:T.textFaint, fontSize:12, flexShrink:0, userSelect:"none", touchAction:"none"}}>⠿</div>
-        <button onClick={onEdit} style={{width:16, height:16, borderRadius:"50%", background: done ? "#555" : task.color, border:"none", flexShrink:0, boxShadow: done ? "none" : `0 0 6px ${task.color}88`, padding:0}}/>
-        <span onClick={onEdit} style={{fontFamily:"'Space Mono',monospace", fontSize:12, color: done ? T.textFaint : T.text, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:"pointer", textDecoration: done ? "line-through" : "none"}}>
-          {task.name}
-        </span>
-        <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color: done ? T.textFaint : task.color, fontWeight:"bold", flexShrink:0}}>
-          {formatHours(task.hours)}
-        </span>
-        <span style={{fontFamily:"'Space Mono',monospace", fontSize:9, color:T.textFaint, flexShrink:0, opacity:0.7}}>{pct}%</span>
-        <div style={{display:"flex", gap:0, flexShrink:0}} onPointerDown={e => e.stopPropagation()}>
-          <Btn44 onClick={() => onChange({ done: !done })} title={done ? "Undo" : "Done"}>
-            <span style={{fontSize:12, opacity: done ? 1 : 0.3}}>{done ? "✅" : "☑️"}</span>
-          </Btn44>
-          {!isFav && <Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12, opacity:0.3}}>★</span></Btn44>}
-          <Btn44 onClick={onLock} title={task.locked ? "Unlock" : "Lock"}>
-            <span style={{fontSize:12, opacity: task.locked ? 1 : 0.3}}>🔒</span>
-          </Btn44>
-          {!task.locked && <Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11, color:T.textDim}}>✕</span></Btn44>}
+    <div style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}} onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd} onContextMenu={e=>e.preventDefault()}>
+      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+        <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:12,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
+        <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:done?"#555":task.color,border:"none",flexShrink:0,boxShadow:done?"none":`0 0 6px ${task.color}88`,padding:0}}/>
+        <span onClick={onEdit} style={{fontFamily:MONO,fontSize:12,color:done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:done?"line-through":"none"}}>{task.name}</span>
+        <span style={{fontFamily:MONO,fontSize:11,color:done?T.textFaint:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
+        <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint,flexShrink:0,opacity:0.7}}>{pct}%</span>
+        <div style={{display:"flex",gap:0,flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
+          <Btn44 onClick={()=>onChange({done:!done})} title={done?"Undo":"Done"}><span style={{fontSize:12,opacity:done?1:0.3}}>{done?"✅":"☑️"}</span></Btn44>
+          {!isFav&&<Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12,opacity:0.3}}>★</span></Btn44>}
+          <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}><span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span></Btn44>
+          {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
         </div>
       </div>
-      <div onPointerDown={e => e.stopPropagation()}>
-        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor}
-          locked={task.locked || done} onChange={h => onChange({ hours: h })}/>
+      <div onPointerDown={e=>e.stopPropagation()}>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
       </div>
     </div>
   );
 }
 
 function EditModal({ task, T, onSave, onClose }) {
-  const [name,  setName]  = useState(task.name);
-  const [color, setColor] = useState(task.color);
+  const [name,setName]=useState(task.name), [color,setColor]=useState(task.color);
+  const save=()=>onSave({name:name.trim()||task.name,color});
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-sheet" style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:"16px 16px 0 0", padding:24}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20}}>
-          <span style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:22, letterSpacing:2, color:T.text}}>EDIT TASK</span>
-          <button onClick={onClose} style={{background:"none", border:"none", color:T.textMuted, fontSize:22, width:44, height:44, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center"}}>✕</button>
+    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <span style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:T.text}}>EDIT TASK</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
-        <label style={{fontSize:10, color:T.textDim, letterSpacing:2, display:"block", marginBottom:6}}>TASK NAME</label>
-        <input value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && onSave({ name: name.trim() || task.name, color })}
-          style={{width:"100%", background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", color:T.text, fontFamily:"'Space Mono',monospace", fontSize:15, marginBottom:20}}/>
-        <label style={{fontSize:10, color:T.textDim, letterSpacing:2, display:"block", marginBottom:10}}>COLOR</label>
-        <div style={{display:"flex", flexWrap:"wrap", gap:10, marginBottom:20}}>
-          {PALETTE.map(c => (
-            <button key={c} onClick={() => setColor(c)}
-              style={{width:36, height:36, borderRadius:"50%", background:c, border: color === c ? `3px solid ${T.text}` : "2px solid transparent", padding:0, boxShadow: color === c ? `0 0 0 2px ${T.bg}, 0 0 0 4px ${c}` : "none", transition:"all 0.15s"}}/>
-          ))}
+        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:6}}>TASK NAME</label>
+        <input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:T.text,fontFamily:MONO,fontSize:15,marginBottom:20}}/>
+        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:10}}>COLOR</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
+          {PALETTE.map(c=><button key={c} onClick={()=>setColor(c)} style={{width:36,height:36,borderRadius:"50%",background:c,border:color===c?`3px solid ${T.text}`:"2px solid transparent",padding:0,boxShadow:color===c?`0 0 0 2px ${T.bg}, 0 0 0 4px ${c}`:"none",transition:"all 0.15s"}}/>)}
         </div>
-        <button onClick={() => onSave({ name: name.trim() || task.name, color })}
-          style={{width:"100%", background:"#FF6B2B", border:"none", borderRadius:12, padding:"15px", color:"#000", fontFamily:"'Space Mono',monospace", fontSize:14, fontWeight:"bold", letterSpacing:1, minHeight:52}}>
-          SAVE CHANGES
-        </button>
+        <button onClick={save} style={{width:"100%",background:"#FF6B2B",border:"none",borderRadius:12,padding:"15px",color:"#000",fontFamily:MONO,fontSize:14,fontWeight:"bold",letterSpacing:1,minHeight:52}}>SAVE CHANGES</button>
+        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Sync Modal ────────────────────────────────────────────────────────────────
+
+function SyncModal({ T, dark, state, onImport, onClose }) {
+  const [mode, setMode] = useState("export"); // "export" | "import"
+  const [importStr, setImportStr] = useState("");
+  const [importMode, setImportMode] = useState("full"); // "full" | "merge"
+  const [copied, setCopied] = useState(false);
+  const [importErr, setImportErr] = useState(null);
+  const [importPreview, setImportPreview] = useState(null);
+  const syncStr = encodeSyncString(state);
+  const textareaRef = useRef();
+
+  const handleCopy = () => {
+    if (!syncStr) return;
+    navigator.clipboard?.writeText(syncStr).then(()=>setCopied(true)).catch(()=>{
+      if (textareaRef.current) { textareaRef.current.select(); document.execCommand("copy"); setCopied(true); }
+    });
+    setTimeout(()=>setCopied(false), 2000);
+  };
+
+  const handleImportStrChange = (val) => {
+    setImportStr(val);
+    setImportErr(null);
+    setImportPreview(null);
+    if (!val.trim()) return;
+    const decoded = decodeSyncString(val);
+    if (!decoded) { setImportErr("Érvénytelen kód — ellenőrizd, hogy teljes-e."); return; }
+    setImportPreview(decoded);
+  };
+
+  const handleImport = () => {
+    if (!importPreview) return;
+    onImport(importPreview, importMode);
+    onClose();
+  };
+
+  const tabStyle = (active) => ({
+    flex:1, padding:"9px 0", background:"none", border:"none",
+    borderBottom: active ? "2px solid #FF6B2B" : `2px solid transparent`,
+    color: active ? "#FF6B2B" : T.textMuted,
+    fontFamily:MONO, fontSize:11, letterSpacing:1, cursor:"pointer",
+    transition:"all 0.15s",
+  });
+
+  return (
+    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:"0 0 16px"}}>
+        {/* Header */}
+        <div style={{padding:"20px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <span style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:T.text}}>SYNC / BACKUP</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,marginBottom:20,padding:"0 4px"}}>
+          <button style={tabStyle(mode==="export")} onClick={()=>setMode("export")}>⬆ EXPORT</button>
+          <button style={tabStyle(mode==="import")} onClick={()=>setMode("import")}>⬇ IMPORT</button>
+        </div>
+
+        <div style={{padding:"0 20px"}}>
+          {mode === "export" && (
+            <div>
+              <p style={{fontFamily:MONO,fontSize:10,color:T.textMuted,lineHeight:1.7,marginBottom:14}}>
+                Ez a kód tartalmaz minden adatot: feladatok, kedvencek, beállítások. Másold ki és illeszd be egy másik eszközön.
+              </p>
+              <textarea
+                ref={textareaRef}
+                readOnly
+                value={syncStr||""}
+                style={{width:"100%",height:88,resize:"none",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px",color:T.textDim,fontFamily:MONO,fontSize:9,lineHeight:1.5,letterSpacing:0.3,marginBottom:12}}
+              />
+              <button
+                onClick={handleCopy}
+                style={{width:"100%",background:copied?"#4ECDC4":"#FF6B2B",border:"none",borderRadius:12,padding:"14px",color:"#000",fontFamily:MONO,fontSize:13,fontWeight:"bold",letterSpacing:1,minHeight:50,transition:"background 0.2s"}}
+              >{copied ? "✓ MÁSOLT!" : "📋 KÓDMÁSOLÁS"}</button>
+            </div>
+          )}
+
+          {mode === "import" && (
+            <div>
+              <p style={{fontFamily:MONO,fontSize:10,color:T.textMuted,lineHeight:1.7,marginBottom:14}}>
+                Illeszd be az exportált kódot, majd válaszd az importálás módját.
+              </p>
+              <textarea
+                value={importStr}
+                onChange={e=>handleImportStrChange(e.target.value)}
+                placeholder="Illeszd ide a kódot…"
+                style={{width:"100%",height:88,resize:"none",background:T.bgInput,border:`1px solid ${importErr?"#ff5555":importPreview?"#4ECDC4":T.border}`,borderRadius:10,padding:"12px",color:T.text,fontFamily:MONO,fontSize:9,lineHeight:1.5,marginBottom:8,transition:"border-color 0.2s"}}
+              />
+              {importErr && <div style={{fontFamily:MONO,fontSize:10,color:"#ff6666",marginBottom:10}}>{importErr}</div>}
+              {importPreview && (
+                <div style={{background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",marginBottom:14,animation:"slideIn 0.15s ease"}}>
+                  <div style={{fontFamily:MONO,fontSize:9,color:"#4ECDC4",marginBottom:6,letterSpacing:1}}>✓ ÉRVÉNYES KÓD</div>
+                  <div style={{fontFamily:MONO,fontSize:10,color:T.textMuted}}>
+                    {importPreview.tasks?.length ?? 0} feladat · {importPreview.favs?.length ?? 0} kedvenc
+                    {importPreview.ts && <span style={{opacity:0.6}}> · {new Date(importPreview.ts).toLocaleDateString("hu-HU")}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Import mode selector */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>IMPORTÁLÁS MÓDJA</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {[
+                    ["full","🔄 Teljes csere","Minden meglévő adatot felülír"],
+                    ["merge","➕ Csak új elemek","Meglévőket megtartja, csak a hiányzókat adja hozzá"],
+                  ].map(([val,label,desc])=>(
+                    <button key={val} onClick={()=>setImportMode(val)} style={{background:importMode===val?`${T.bgSlider}`:"none",border:`1px solid ${importMode===val?"#FF6B2B":T.border}`,borderRadius:10,padding:"10px 14px",textAlign:"left",display:"flex",flexDirection:"column",gap:3,transition:"all 0.15s",cursor:"pointer"}}>
+                      <span style={{fontFamily:MONO,fontSize:11,color:importMode===val?"#FF6B2B":T.text,fontWeight:"bold"}}>{label}</span>
+                      <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint}}>{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handleImport}
+                disabled={!importPreview}
+                style={{width:"100%",background:importPreview?"#FF6B2B":"#333",border:"none",borderRadius:12,padding:"14px",color:importPreview?"#000":"#666",fontFamily:MONO,fontSize:13,fontWeight:"bold",letterSpacing:1,minHeight:50,transition:"all 0.2s",cursor:importPreview?"pointer":"not-allowed"}}
+              >IMPORTÁLÁS</button>
+            </div>
+          )}
+        </div>
         <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
       </div>
     </div>
@@ -970,347 +769,197 @@ function EditModal({ task, T, onSave, onClose }) {
 }
 
 function Timeline({ tasks, T, dayLen, dayStart }) {
-  const visibleTasks = tasks.filter(t => t.hours > 0.02);
-  let cursor = 0;
-  const segments = visibleTasks.map(t => { const s = cursor; cursor += t.hours; return { ...t, start: s }; });
-  const ticks    = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round((dayStart + f * dayLen) * 2) / 2);
+  let cursor=0;
+  const segs=tasks.filter(t=>t.hours>0.02).map(t=>{const s=cursor;cursor+=t.hours;return{...t,start:s};});
+  const ticks=[0,.25,.5,.75,1].map(f=>Math.round((dayStart+f*dayLen)*2)/2);
   return (
-    <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 14px 10px", marginBottom:16}}>
-      <div style={{position:"relative", height:36, borderRadius:6, overflow:"hidden", background:T.bgSlider, marginBottom:6}}>
-        {segments.map(s => {
-          const left  = (s.start / dayLen) * 100;
-          const width = (s.hours / dayLen) * 100;
-          return (
-            <div key={s.id} style={{position:"absolute", left:`${left}%`, width:`${width}%`, top:0, bottom:0, background: s.done ? "#444" : s.color, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", minWidth:2, opacity: s.done ? 0.45 : 1}}>
-              {width > 7 && <span style={{fontSize:9, color:"rgba(0,0,0,0.65)", fontFamily:"'Space Mono',monospace", whiteSpace:"nowrap", padding:"0 4px", fontWeight:"bold"}}>{s.name}</span>}
-            </div>
-          );
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 10px",marginBottom:16}}>
+      <div style={{position:"relative",height:36,borderRadius:6,overflow:"hidden",background:T.bgSlider,marginBottom:6}}>
+        {segs.map(s=>{
+          const left=(s.start/dayLen)*100, w=(s.hours/dayLen)*100;
+          return <div key={s.id} style={{position:"absolute",left:`${left}%`,width:`${w}%`,top:0,bottom:0,background:s.done?"#444":s.color,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",minWidth:2,opacity:s.done?.45:1}}>{w>7&&<span style={{fontSize:9,color:"rgba(0,0,0,0.65)",fontFamily:MONO,whiteSpace:"nowrap",padding:"0 4px",fontWeight:"bold"}}>{s.name}</span>}</div>;
         })}
       </div>
-      <div style={{display:"flex", justifyContent:"space-between", fontFamily:"'Space Mono',monospace", fontSize:9, color:T.textFaint, paddingLeft:2, paddingRight:2}}>
-        {ticks.map((h, i) => <span key={i}>{String(Math.floor(h)).padStart(2,"0")}:{h%1?"30":"00"}</span>)}
+      <div style={{display:"flex",justifyContent:"space-between",fontFamily:MONO,fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
+        {ticks.map((h,i)=><span key={i}>{String(Math.floor(h)).padStart(2,"0")}:{h%1?"30":"00"}</span>)}
       </div>
     </div>
   );
 }
 
-function ThemeToggle({ dark, onToggle, T }) {
-  return (
-    <button onClick={onToggle} style={{display:"flex", alignItems:"center", gap:6, background:"none", border:`1px solid ${T.border}`, borderRadius:20, padding:"6px 10px", minHeight:36}}>
-      <span style={{fontSize:13}}>{dark ? "☀️" : "🌙"}</span>
-      <div style={{width:28, height:16, borderRadius:8, background: dark ? "#444" : T.borderMid, position:"relative", transition:"background 0.2s", flexShrink:0}}>
-        <div style={{position:"absolute", top:2, left: dark ? 12 : 2, width:12, height:12, borderRadius:"50%", background:"#FF6B2B", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
-      </div>
-    </button>
-  );
-}
-
-function FileBtn({ label, onClick, danger, dark }) {
-  return (
-    <button onClick={onClick}
-      style={{background: danger ? (dark?"#3a0a0a":"#e8c0c0") : (dark?"#0e0e10":"#d0cec8"), border:`1px solid ${danger?"#ff5555":(dark?"#505055":"#a8a6a0")}`, borderRadius:10, padding:"12px 10px", minHeight:48, color: danger?"#ff7777":(dark?"#cccccc":"#2a2a2a"), fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:0.5, width:"100%", transition:"opacity 0.1s"}}
-      onTouchStart={e => e.currentTarget.style.opacity = "0.7"}
-      onTouchEnd={e   => e.currentTarget.style.opacity = "1"}
-    >{label}</button>
-  );
-}
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 8 — MAIN APP
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
-  const [state, dispatch]           = useReducer(reducer, null, initState);
-  const [newName,       setNewName]       = useState("");
-  const [editTask,      setEditTask]      = useState(null);
-  const [toast,         setToast]         = useState(null);
-  const [confirmRm,     setConfirmRm]     = useState(null);
-  const [confirmReset,  setConfirmReset]  = useState(false);
-  const [showSettings,  setShowSettings]  = useState(false);
-  const [showFavs,      setShowFavs]      = useState(false);
-  const [dragOver,      setDragOver]      = useState(null);
-  const [longDragIdx,   setLongDragIdx]   = useState(null);
-  const [dragPos,       setDragPos]       = useState({ x: 0, y: 0 });
-
-  const longPressTimer = useRef(null);
-  const confirmRmTimer = useRef(null);
-  const taskListRef    = useRef();
-  const fileRef        = useRef();
-  const inputRef       = useRef();
+  const [state,dispatch]=useReducer(reducer,null,initState);
+  const [newName,setNewName]=useState(""), [editTask,setEditTask]=useState(null), [toast,setToast]=useState(null);
+  const [confirmRm,setConfirmRm]=useState(null), [confirmReset,setConfirmReset]=useState(false);
+  const [showSettings,setShowSettings]=useState(false), [showFavs,setShowFavs]=useState(false);
+  const [showSync,setShowSync]=useState(false);
+  const [dragOver,setDragOver]=useState(null), [longDragIdx,setLongDragIdx]=useState(null), [dragPos,setDragPos]=useState({x:0,y:0});
+  const lpTimer=useRef(null), confirmRmTimer=useRef(null), taskListRef=useRef(), fileRef=useRef(), inputRef=useRef();
 
   const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
-  const dayLen    = dayEnd >= dayStart ? dayEnd - dayStart : (24 - dayStart) + dayEnd;
-  const T         = dark ? DARK : LIGHT;
-  const total     = tasks.reduce((s, t) => s + t.hours, 0);
-  const remaining = dayLen - total;
-  const over      = remaining < -FLOAT_TOLERANCE;
-  const perfect   = Math.abs(remaining) < FLOAT_TOLERANCE;
+  const dl=calcDayLen(dayStart,dayEnd), T=dark?DARK:LIGHT;
+  const total=tasks.reduce((s,t)=>s+t.hours,0), remaining=dl-total;
+  const over=remaining<-TOL, perfect=Math.abs(remaining)<TOL;
 
-  // Persist state on every change
-  useEffect(() => { saveState(state); }, [state]);
+  useEffect(()=>{saveState(state);},[state]);
+  useEffect(()=>{
+    document.documentElement.style.setProperty("--bg-slider",T.bgSlider);
+    document.body.style.background=T.bg;
+    document.getElementById("themeColorMeta").content=T.tc;
+  },[dark]);
 
-  // Sync CSS custom properties + body colour when theme changes
-  useEffect(() => {
-    document.documentElement.style.setProperty("--bg-slider", T.bgSlider);
-    document.documentElement.style.setProperty("--border-mid", T.borderMid);
-    document.body.style.background = T.bg;
-    document.getElementById("themeColorMeta").content = T.tc;
-  }, [dark]);
+  const showToast=(msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),TOAST_MS); };
+  const setConfirmRmWithTimer=name=>{ clearTimeout(confirmRmTimer.current); setConfirmRm(name); if(name!==null)confirmRmTimer.current=setTimeout(()=>setConfirmRm(null),CONFIRM_MS); };
 
-  // ── Toast ──────────────────────────────────────────────────────────────────
-  const showToast = (msg, type = "ok") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), TOAST_DURATION_MS);
+  const addTask=(nameArg,colorArg,hoursArg)=>{
+    const name=(nameArg||newName).trim(); if(!name)return;
+    if(tasks.some(t=>nameLc(t.name)===nameLc(name))){showToast("Task already exists","err");return;}
+    dispatch({type:"ADD_TASK",name,color:colorArg,hours:hoursArg});
+    setConfirmRmWithTimer(null); setNewName(""); inputRef.current?.blur();
   };
 
-  // ── Confirm-remove (auto-cancels after timeout) ────────────────────────────
-  const setConfirmRmWithTimer = name => {
-    clearTimeout(confirmRmTimer.current);
-    setConfirmRm(name);
-    if (name !== null) confirmRmTimer.current = setTimeout(() => setConfirmRm(null), CONFIRM_TIMEOUT_MS);
+  const startLongDrag=(i,e)=>{
+    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    clearTimeout(lpTimer.current);
+    lpTimer.current=setTimeout(()=>{ try{if(navigator.vibrate)navigator.vibrate([12,40,12])}catch{} setLongDragIdx(i);setDragPos({x:cx,y:cy}); },LONG_PRESS_MS);
   };
+  const cancelLongPress=()=>clearTimeout(lpTimer.current);
 
-  // ── Add task ───────────────────────────────────────────────────────────────
-  const addTask = (nameArg, colorArg, hoursArg) => {
-    const name = (nameArg || newName).trim();
-    if (!name) return;
-    if (tasks.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-      showToast("Task already exists", "err"); return;
+  useEffect(()=>{
+    if(longDragIdx===null)return;
+    document.body.style.overflow="hidden"; document.body.style.touchAction="none";
+    const onMove=e=>{ if(e.cancelable)e.preventDefault(); const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY; setDragPos({x:cx,y:cy}); const els=taskListRef.current?.querySelectorAll("[data-taskcard]"); if(!els)return; let found=null; for(let i=0;i<els.length;i++){const r=els[i].getBoundingClientRect();if(cy>=r.top&&cy<=r.bottom){found=i;break;}} setDragOver(found!==null&&found!==longDragIdx?found:null); };
+    const onUp=()=>{ if(dragOver!==null&&longDragIdx!==null&&dragOver!==longDragIdx)dispatch({type:"REORDER_TASKS",from:longDragIdx,to:dragOver}); setLongDragIdx(null);setDragOver(null); };
+    window.addEventListener("pointermove",onMove,{passive:false}); window.addEventListener("pointerup",onUp);
+    window.addEventListener("touchmove",onMove,{passive:false});   window.addEventListener("touchend",onUp);
+    return ()=>{ document.body.style.overflow=""; document.body.style.touchAction=""; window.removeEventListener("pointermove",onMove); window.removeEventListener("pointerup",onUp); window.removeEventListener("touchmove",onMove); window.removeEventListener("touchend",onUp); };
+  },[longDragIdx,dragOver]);
+
+  const exportMD=()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([serializeMD(tasks,dayStart,dayEnd)],{type:"text/markdown"})); a.download="sliders.md"; a.click(); showToast("Exported ✓"); };
+  const handleFile=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{const{tasks:p,dayStart:ds,dayEnd:de}=parseMD(ev.target.result); if(!p.length){showToast("No tasks found","err");return;} dispatch({type:"SET_TASKS",tasks:p}); if(ds!==null&&de!==null&&de>ds)dispatch({type:"SET_DAY_WINDOW",start:ds,end:de}); showToast(`${p.length} tasks loaded`);}; r.readAsText(f); e.target.value=""; };
+
+  const handleSyncImport = (data, mode) => {
+    if (mode === "full") {
+      dispatch({ type:"FULL_REPLACE", data });
+      showToast("Teljes csere kész ✓");
+    } else {
+      dispatch({ type:"MERGE_IMPORT", data });
+      showToast("Új elemek hozzáadva ✓");
     }
-    dispatch({ type: "ADD_TASK", name, color: colorArg, hours: hoursArg });
-    setConfirmRmWithTimer(null);
-    setNewName("");
-    inputRef.current?.blur();
   };
 
-  // ── Long-press drag (list reorder) ─────────────────────────────────────────
-  const startLongDrag = (i, e) => {
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    clearTimeout(longPressTimer.current);
-    longPressTimer.current = setTimeout(() => {
-      try { if (navigator.vibrate) navigator.vibrate([12, 40, 12]); } catch {}
-      setLongDragIdx(i);
-      setDragPos({ x: clientX, y: clientY });
-    }, LONG_PRESS_DELAY_MS);
-  };
+  const collapsibleBtn=(label,open,onClick,extra={})=>(
+    <button onClick={onClick} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"9px 14px",color:T.textMuted,fontFamily:MONO,fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",...extra}}>
+      <span>{label}</span><span style={{fontSize:11}}>{open?"▲":"▼"}</span>
+    </button>
+  );
 
-  const cancelLongPress = () => clearTimeout(longPressTimer.current);
-
-  useEffect(() => {
-    if (longDragIdx === null) return;
-    const onMove = e => {
-      if (e.cancelable) e.preventDefault();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      setDragPos({ x: clientX, y: clientY });
-      const els = taskListRef.current?.querySelectorAll("[data-taskcard]");
-      if (!els) return;
-      let found = null;
-      for (let i = 0; i < els.length; i++) {
-        const r = els[i].getBoundingClientRect();
-        if (clientY >= r.top && clientY <= r.bottom) { found = i; break; }
-      }
-      setDragOver(found !== null && found !== longDragIdx ? found : null);
-    };
-    const onUp = () => {
-      if (dragOver !== null && longDragIdx !== null && dragOver !== longDragIdx) {
-        dispatch({ type: "REORDER_TASKS", from: longDragIdx, to: dragOver });
-      }
-      setLongDragIdx(null); setDragOver(null);
-    };
-    // Lock page scroll while dragging
-    document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
-    window.addEventListener("pointermove", onMove, { passive: false });
-    window.addEventListener("pointerup",   onUp);
-    window.addEventListener("touchmove",   onMove, { passive: false });
-    window.addEventListener("touchend",    onUp);
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup",   onUp);
-      window.removeEventListener("touchmove",   onMove);
-      window.removeEventListener("touchend",    onUp);
-    };
-  }, [longDragIdx, dragOver]);
-
-  // ── Export / import ────────────────────────────────────────────────────────
-  const exportMD = () => {
-    const blob = new Blob([serializeMD(tasks, dayStart, dayEnd)], { type: "text/markdown" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = "sliders.md"; a.click();
-    URL.revokeObjectURL(url);
-    showToast("Exported ✓");
-  };
-
-  const handleFile = e => {
-    const f = e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const { tasks: parsed, dayStart: ds, dayEnd: de } = parseMD(ev.target.result);
-      if (!parsed.length) { showToast("No tasks found", "err"); return; }
-      dispatch({ type: "SET_TASKS", tasks: parsed });
-      if (ds !== null && de !== null && de > ds) dispatch({ type: "SET_DAY_WINDOW", start: ds, end: de });
-      showToast(`${parsed.length} tasks loaded`);
-    };
-    reader.readAsText(f);
-    e.target.value = "";
-  };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="main-wrap" style={{minHeight:"100dvh", background:T.bg, color:T.text, fontFamily:"'Space Mono',monospace", maxWidth:520, margin:"0 auto", paddingBottom:100, transition:"background 0.25s,color 0.25s"}}>
+    <div className="main-wrap" style={{minHeight:"100dvh",background:T.bg,color:T.text,fontFamily:MONO,maxWidth:520,margin:"0 auto",paddingBottom:100,transition:"background 0.25s,color 0.25s"}}>
 
       {/* HEADER */}
-      <div className="sticky-header" style={{background:T.bg, transition:"background 0.25s"}}>
-        <div style={{padding:"14px 16px 12px", borderBottom:`1px solid ${T.border}`}}>
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-            <div style={{display:"flex", alignItems:"baseline", gap:8}}>
-              <h1 style={{fontFamily:"'Bebas Neue',sans-serif", fontSize:36, letterSpacing:3, color:"#FF6B2B", lineHeight:1}}>SLIDERS</h1>
-              <span style={{fontFamily:"'Space Mono',monospace", fontSize:8, color:T.textFaint, background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:4, padding:"2px 5px", letterSpacing:1}}>{step}m</span>
+      <div className="sticky-header" style={{background:T.bg,transition:"background 0.25s"}}>
+        <div style={{padding:"14px 16px 12px",borderBottom:`1px solid ${T.border}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+              <h1 style={{fontFamily:BEBAS,fontSize:36,letterSpacing:3,color:"#FF6B2B",lineHeight:1}}>SLIDERS</h1>
+              <span style={{fontFamily:MONO,fontSize:8,color:T.textFaint,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:4,padding:"2px 5px",letterSpacing:1}}>{step}m</span>
             </div>
-            <div style={{display:"flex", alignItems:"center", gap:10, flexShrink:0}}>
-              <div style={{textAlign:"left", width:96, flexShrink:0}}>
-                <div style={{fontSize:26, fontFamily:"'Bebas Neue',sans-serif", letterSpacing:1, lineHeight:1, color: over?"#ff4444":perfect?"#4ECDC4":T.textSub, whiteSpace:"nowrap"}}>
-                  {perfect ? `${formatHours(dayLen)} ✓` : formatHours(Math.abs(remaining))}
-                </div>
-                <div style={{fontSize:8, color: over?"#ff4444":T.textFaint, letterSpacing:1}}>
-                  {over ? "OVER BY" : perfect ? "ALLOCATED" : "REMAINING"}
-                </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+              <div style={{textAlign:"left",width:96,flexShrink:0}}>
+                <div style={{fontSize:26,fontFamily:BEBAS,letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub,whiteSpace:"nowrap"}}>{perfect?`${formatHours(dl)} ✓`:formatHours(Math.abs(remaining))}</div>
+                <div style={{fontSize:8,color:over?"#ff4444":T.textFaint,letterSpacing:1}}>{over?"OVER BY":perfect?"ALLOCATED":"REMAINING"}</div>
               </div>
-              <div style={{flexShrink:0, width:66}}>
-                <ThemeToggle dark={dark} onToggle={() => dispatch({ type: "SET_DARK", dark: !dark })} T={T}/>
-              </div>
+              <button onClick={()=>dispatch({type:"SET_DARK",dark:!dark})} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:`1px solid ${T.border}`,borderRadius:20,padding:"6px 10px",minHeight:36,flexShrink:0,width:66}}>
+                <span style={{fontSize:13}}>{dark?"☀️":"🌙"}</span>
+                <div style={{width:28,height:16,borderRadius:8,background:dark?"#444":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
+                  <div style={{position:"absolute",top:2,left:dark?12:2,width:12,height:12,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
+                </div>
+              </button>
             </div>
           </div>
         </div>
-        {/* Allocation progress bar */}
-        <div style={{height:2, background:T.bgSlider, position:"relative", overflow:"hidden"}}>
-          <div style={{position:"absolute", left:0, top:0, bottom:0, width:`${Math.min(100,(total/dayLen)*100)}%`, background: over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B", transition:"width 0.2s,background 0.2s", borderRadius:"0 2px 2px 0"}}/>
+        <div style={{height:2,background:T.bgSlider,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${Math.min(100,(total/dl)*100)}%`,background:over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B",transition:"width 0.2s,background 0.2s",borderRadius:"0 2px 2px 0"}}/>
         </div>
       </div>
 
       <div style={{padding:"0 16px"}}>
 
-        {/* DONUT + CIRCULAR SLIDER */}
-        <div style={{margin:"12px 0", padding:"16px 16px 12px", background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:14}}>
-          <div style={{display:"flex", alignItems:"center", gap:8}}>
-            <div style={{position:"relative", width:220, height:220, flexShrink:0, margin:"14px 16px"}}>
-              <CircularDaySlider dayStart={dayStart} dayEnd={dayEnd} T={T}
-                onChange={(s, e) => dispatch({ type: "SET_DAY_WINDOW", start: s, end: e })}/>
-              <Donut tasks={tasks} T={T} dayLen={dayLen}
-                onReorder={(from, to) => dispatch({ type: "REORDER_TASKS", from, to })}/>
+        {/* DONUT + RING */}
+        <div style={{margin:"12px 0",padding:"16px 16px 12px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{position:"relative",width:220,height:220,flexShrink:0,margin:"14px 16px"}}>
+              <CircularDaySlider dayStart={dayStart} dayEnd={dayEnd} T={T} onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}/>
+              <Donut tasks={tasks} T={T} dayLen={dl} onReorder={(f,t)=>dispatch({type:"REORDER_TASKS",from:f,to:t})}/>
             </div>
-
-            {/* Legend + start now */}
-            <div style={{flex:1, overflow:"hidden", minWidth:0, display:"flex", flexDirection:"column", gap:0}}>
-              {tasks.map(t => {
-                const pct   = dayLen > 0 ? Math.max(2, (t.hours / dayLen) * 100) : 0;
-                const color = t.done ? "#555" : t.color;
+            <div style={{flex:1,overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:0}}>
+              {tasks.map(t=>{
+                const pct=dl>0?Math.max(2,(t.hours/dl)*100):0, c=t.done?"#555":t.color;
                 return (
-                  <div key={t.id} style={{marginBottom:7, opacity: t.done ? 0.4 : 1, transition:"opacity 0.2s"}}>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:3}}>
-                      <span style={{fontSize:10, color: t.done?T.textFaint:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", textDecoration: t.done?"line-through":"none", maxWidth:"65%", fontFamily:"'Space Mono',monospace"}}>{t.name}</span>
-                      <span style={{fontSize:9, color, flexShrink:0, fontFamily:"'Space Mono',monospace", opacity:0.9}}>{formatHours(t.hours)}</span>
+                  <div key={t.id} style={{marginBottom:7,opacity:t.done?.4:1,transition:"opacity 0.2s"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
+                      <span style={{fontSize:10,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",maxWidth:"65%",fontFamily:MONO}}>{t.name}</span>
+                      <span style={{fontSize:9,color:c,flexShrink:0,fontFamily:MONO,opacity:0.9}}>{formatHours(t.hours)}</span>
                     </div>
-                    <div style={{height:4, borderRadius:3, background:T.bgSlider, overflow:"hidden"}}>
-                      <div style={{height:"100%", width:`${pct}%`, borderRadius:3, background:color, boxShadow: t.done?"none":`0 0 6px ${color}66`, transition:"width 0.3s"}}/>
+                    <div style={{height:4,borderRadius:3,background:T.bgSlider,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,borderRadius:3,background:c,boxShadow:t.done?"none":`0 0 6px ${c}66`,transition:"width 0.3s"}}/>
                     </div>
                   </div>
                 );
               })}
-              {tasks.length === 0 && <span style={{fontSize:10, color:T.textFaint}}>No tasks yet</span>}
-              <button
-                onClick={() => {
-                  const now = new Date();
-                  const totalMins = now.getHours() * 60 + now.getMinutes();
-                  dispatch({ type: "SET_DAY_START", start: Math.min(Math.ceil(totalMins / step) * step / 60, 23.5) });
-                  showToast("Start → now ✓");
-                }}
-                style={{marginTop:6, background:"none", border:`1px solid ${T.borderMid}`, borderRadius:8, padding:"7px 10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer", display:"flex", alignItems:"center", gap:5, transition:"all 0.15s", letterSpacing:0.5}}
-                onMouseEnter={e  => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
-                onMouseLeave={e  => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
-                onTouchStart={e  => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
-                onTouchEnd={e    => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
+              {tasks.length===0&&<span style={{fontSize:10,color:T.textFaint}}>No tasks yet</span>}
+              <button onClick={()=>{ const now=new Date(), m=now.getHours()*60+now.getMinutes(); dispatch({type:"SET_DAY_START",start:Math.min(Math.ceil(m/step)*step/60,23.5)}); showToast("Start → now ✓"); }}
+                style={{marginTop:6,background:"none",border:`1px solid ${T.borderMid}`,borderRadius:8,padding:"7px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all 0.15s",letterSpacing:0.5}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
+                onTouchStart={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
+                onTouchEnd={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
               ><span>⏱</span> start now</button>
             </div>
           </div>
         </div>
 
-        {/* TIMELINE */}
-        {showTL && <Timeline tasks={tasks} T={T} dayLen={dayLen} dayStart={dayStart}/>}
+        {showTL&&<Timeline tasks={tasks} T={T} dayLen={dl} dayStart={dayStart}/>}
 
         {/* SETTINGS */}
         <div style={{marginBottom:10}}>
-          <div style={{marginBottom:6}}>
-            <button onClick={() => setShowSettings(v => !v)}
-              style={{width:"100%", background:"none", border:`1px solid ${T.border}`, borderRadius:10, padding:"9px 14px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer"}}>
-              <span>⚙ SETTINGS</span>
-              <span style={{fontSize:11}}>{showSettings ? "▲" : "▼"}</span>
-            </button>
-          </div>
-          {showSettings && (
-            <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 16px", animation:"slideIn 0.15s ease"}}>
-
-              {/* Timeline toggle */}
-              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${T.border}`, marginBottom:12}}>
-                <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:T.textSub}}>Timeline view</span>
-                <button onClick={() => dispatch({ type: "SET_SHOW_TL", v: !showTL })}
-                  style={{width:44, height:24, borderRadius:12, background: showTL?"#FF6B2B":"#484850", border:"none", position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0}}>
-                  <div style={{position:"absolute", top:3, left: showTL?22:3, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
+          <div style={{marginBottom:6}}>{collapsibleBtn("⚙ SETTINGS",showSettings,()=>setShowSettings(v=>!v))}</div>
+          {showSettings&&(
+            <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 16px",animation:"slideIn 0.15s ease"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
+                <span style={{fontFamily:MONO,fontSize:11,color:T.textSub}}>Timeline view</span>
+                <button onClick={()=>dispatch({type:"SET_SHOW_TL",v:!showTL})} style={{width:44,height:24,borderRadius:12,background:showTL?"#FF6B2B":"#484850",border:"none",position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                  <div style={{position:"absolute",top:3,left:showTL?22:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
                 </button>
               </div>
-
-              {/* Snap size */}
               <div style={{marginBottom:12}}>
-                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>SNAP SIZE</div>
-                <div style={{display:"flex", gap:6}}>
-                  {STEPS.map(s => {
-                    const active = s.m === step;
-                    return (
-                      <button key={s.m} onClick={() => dispatch({ type: "SET_STEP", step: s.m })}
-                        style={{flex:1, background: active?"#FF6B2B":T.bgInput, border:`1px solid ${active?"#FF6B2B":T.border}`, borderRadius:8, padding:"8px 0", color: active?"#000":T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight: active?"bold":"normal", transition:"all 0.15s"}}>
-                        {s.l}
-                      </button>
-                    );
-                  })}
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>SNAP SIZE</div>
+                <div style={{display:"flex",gap:6}}>
+                  {STEPS.map(s=><button key={s.m} onClick={()=>dispatch({type:"SET_STEP",step:s.m})} style={{flex:1,background:s.m===step?"#FF6B2B":T.bgInput,border:`1px solid ${s.m===step?"#FF6B2B":T.border}`,borderRadius:8,padding:"8px 0",color:s.m===step?"#000":T.textMuted,fontFamily:MONO,fontSize:11,fontWeight:s.m===step?"bold":"normal",transition:"all 0.15s"}}>{s.l}</button>)}
                 </div>
               </div>
-
-              {/* File export/import */}
               <div style={{marginBottom:12}}>
-                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>FILE</div>
-                <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-                  <FileBtn label="⬇ EXPORT .MD" onClick={exportMD} dark={dark}/>
-                  <FileBtn label="⬆ IMPORT .MD" onClick={() => fileRef.current.click()} dark={dark}/>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>FILE</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[["⬇ EXPORT .MD",exportMD],["⬆ IMPORT .MD",()=>fileRef.current.click()]].map(([label,onClick])=>(
+                    <button key={label} onClick={onClick} style={{background:dark?"#0e0e10":"#d0cec8",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:10,padding:"12px 10px",minHeight:48,color:dark?"#cccccc":"#2a2a2a",fontFamily:MONO,fontSize:10,letterSpacing:0.5,width:"100%",transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.7"} onTouchEnd={e=>e.currentTarget.style.opacity="1"}>{label}</button>
+                  ))}
                 </div>
               </div>
               <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
-
-              {/* Danger zone */}
               <div>
-                <div style={{fontSize:9, color:T.textDim, letterSpacing:1.5, marginBottom:8, fontFamily:"'Space Mono',monospace"}}>DANGER</div>
-                {!confirmReset ? (
-                  <button onClick={() => setConfirmReset(true)}
-                    style={{width:"100%", background:"none", border:"1px solid #cc3333", borderRadius:10, padding:"10px", color:"#cc3333", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, cursor:"pointer"}}>
-                    ⚠ RESET APP
-                  </button>
-                ) : (
-                  <div style={{background:"#1a0000", border:"1px solid #ff2222", borderRadius:10, padding:"14px", animation:"slideIn 0.15s ease"}}>
-                    <div style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:"#ff4444", marginBottom:12, lineHeight:1.6}}>
-                      Reset everything?<br/>
-                      <span style={{fontSize:9, color:"#cc4444", opacity:0.8}}>Tasks, favourites and settings will be wiped.</span>
-                    </div>
-                    <div style={{display:"flex", gap:8}}>
-                      <button onClick={() => { localStorage.removeItem(STORAGE_KEY); window.location.reload(); }}
-                        style={{flex:1, background:"#cc0000", border:"none", borderRadius:8, padding:"10px", color:"#fff", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:"bold", minHeight:44}}>YES</button>
-                      <button onClick={() => setConfirmReset(false)}
-                        style={{flex:1, background:"none", border:`1px solid ${dark?"#505055":"#a8a6a0"}`, borderRadius:8, padding:"10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:11, minHeight:44}}>CANCEL</button>
+                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>DANGER</div>
+                {!confirmReset?(
+                  <button onClick={()=>setConfirmReset(true)} style={{width:"100%",background:"none",border:"1px solid #cc3333",borderRadius:10,padding:"10px",color:"#cc3333",fontFamily:MONO,fontSize:10,letterSpacing:1,cursor:"pointer"}}>⚠ RESET APP</button>
+                ):(
+                  <div style={{background:"#1a0000",border:"1px solid #ff2222",borderRadius:10,padding:"14px",animation:"slideIn 0.15s ease"}}>
+                    <div style={{fontFamily:MONO,fontSize:11,color:"#ff4444",marginBottom:12,lineHeight:1.6}}>Reset everything?<br/><span style={{fontSize:9,color:"#cc4444",opacity:0.8}}>Tasks, favourites and settings will be wiped.</span></div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>{localStorage.removeItem(STORAGE_KEY);window.location.reload();}} style={{flex:1,background:"#cc0000",border:"none",borderRadius:8,padding:"10px",color:"#fff",fontFamily:MONO,fontSize:11,fontWeight:"bold",minHeight:44}}>YES</button>
+                      <button onClick={()=>setConfirmReset(false)} style={{flex:1,background:"none",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"10px",color:T.textMuted,fontFamily:MONO,fontSize:11,minHeight:44}}>CANCEL</button>
                     </div>
                   </div>
                 )}
@@ -1319,39 +968,44 @@ function App() {
           )}
         </div>
 
+        {/* SYNC BUTTON */}
+        <div style={{marginBottom:12}}>
+          <button
+            onClick={()=>setShowSync(true)}
+            style={{
+              width:"100%", background:"none",
+              border:`1px solid ${T.border}`,
+              borderRadius:10, padding:"11px 14px",
+              color:T.textMuted, fontFamily:MONO, fontSize:10,
+              letterSpacing:1, display:"flex", justifyContent:"space-between",
+              alignItems:"center", cursor:"pointer", transition:"all 0.15s",
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="#FF6B2B";e.currentTarget.style.color="#FF6B2B";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textMuted;}}
+          >
+            <span>🔗 SYNC / BACKUP</span>
+            <span style={{fontSize:9,opacity:0.6,letterSpacing:0}}>export · import</span>
+          </button>
+        </div>
+
         {/* FAVOURITES */}
         <div style={{marginBottom:12}}>
-          <button onClick={() => setShowFavs(v => !v)}
-            style={{width:"100%", background:"none", border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 16px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:1, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", marginBottom: showFavs?8:0, transition:"margin 0.15s"}}>
-            <span>★ FAVOURITES{favs.length > 0 ? ` (${favs.length})` : ""}</span>
-            <span style={{fontSize:12}}>{showFavs ? "▲" : "▼"}</span>
-          </button>
-          {showFavs && (
-            <div style={{background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 12px", animation:"slideIn 0.15s ease"}}>
-              {favs.length === 0 && (
-                <div style={{textAlign:"center", padding:"16px 0", fontFamily:"'Space Mono',monospace", fontSize:11, color:T.textFaint, letterSpacing:1}}>NO FAVOURITES YET — STAR A TASK</div>
-              )}
-              <div style={{display:"flex", gap:7, flexWrap:"wrap"}}>
-                {favs.map(f => {
-                  const active  = tasks.some(t => t.name.toLowerCase() === f.name.toLowerCase());
-                  const pending = confirmRm === f.name;
-                  const MAX_CHARS  = 14;
-                  const displayName = pending ? "tap to cancel" : (f.name.length > MAX_CHARS ? f.name.slice(0, MAX_CHARS) + "…" : f.name);
+          {collapsibleBtn(`★ FAVOURITES${favs.length>0?` (${favs.length})`:""}`,showFavs,()=>setShowFavs(v=>!v),{marginBottom:showFavs?8:0,transition:"margin 0.15s"})}
+          {showFavs&&(
+            <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",animation:"slideIn 0.15s ease"}}>
+              {favs.length===0&&<div style={{textAlign:"center",padding:"16px 0",fontFamily:MONO,fontSize:11,color:T.textFaint,letterSpacing:1}}>NO FAVOURITES YET — STAR A TASK</div>}
+              <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                {favs.map(f=>{
+                  const active=tasks.some(t=>nameLc(t.name)===nameLc(f.name)), pending=confirmRm===f.name;
+                  const dn=pending?"tap to cancel":(f.name.length>14?f.name.slice(0,14)+"…":f.name);
                   return (
-                    <div key={f.name} style={{display:"flex", alignItems:"center", borderRadius:10, overflow:"hidden", border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`, opacity: active?0.45:1, transition:"all 0.15s"}}>
-                      <button
-                        onClick={() => { if (pending) { setConfirmRmWithTimer(null); return; } if (!active) addTask(f.name, f.color, f.hours); }}
-                        style={{background: pending?"#3a0a0a":active?T.bgCard:`${f.color}22`, border:"none", padding:"8px 12px", display:"flex", alignItems:"center", gap:7, cursor: active&&!pending?"default":"pointer", minHeight:40}}>
-                        <div style={{width:8, height:8, borderRadius:"50%", background: pending?"#ff5555":f.color, flexShrink:0}}/>
-                        <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color: pending?"#ff7777":active?T.textFaint:T.text, whiteSpace:"nowrap"}}>{displayName}</span>
-                        {!pending && <span style={{fontFamily:"'Space Mono',monospace", fontSize:10, color:f.color, opacity:0.8}}>{formatHours(f.hours)}</span>}
+                    <div key={f.name} style={{display:"flex",alignItems:"center",borderRadius:10,overflow:"hidden",border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`,opacity:active?.45:1,transition:"all 0.15s"}}>
+                      <button onClick={()=>{if(pending){setConfirmRmWithTimer(null);return;}if(!active)addTask(f.name,f.color,f.hours);}} style={{background:pending?"#3a0a0a":active?T.bgCard:`${f.color}22`,border:"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:7,cursor:active&&!pending?"default":"pointer",minHeight:40}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:pending?"#ff5555":f.color,flexShrink:0}}/>
+                        <span style={{fontFamily:MONO,fontSize:11,color:pending?"#ff7777":active?T.textFaint:T.text,whiteSpace:"nowrap"}}>{dn}</span>
+                        {!pending&&<span style={{fontFamily:MONO,fontSize:10,color:f.color,opacity:0.8}}>{formatHours(f.hours)}</span>}
                       </button>
-                      <button
-                        onClick={() => pending ? (dispatch({ type: "DEL_FAV", name: f.name }), setConfirmRmWithTimer(null)) : setConfirmRmWithTimer(f.name)}
-                        style={{background: pending?"#ff444430":"none", border:"none", borderLeft:`1px solid ${pending?"#ff5555":T.border}`, padding:"8px 10px", color: pending?"#ff5555":T.textDim, fontSize:11, cursor:"pointer", minHeight:40, display:"flex", alignItems:"center", fontFamily:"'Space Mono',monospace", transition:"all 0.15s"}}
-                        onMouseEnter={e => { if (!pending) e.currentTarget.style.color = "#ff5555"; }}
-                        onMouseLeave={e => { if (!pending) e.currentTarget.style.color = T.textDim; }}
-                      >{pending ? "remove" : "✕"}</button>
+                      <button onClick={()=>pending?(dispatch({type:"DEL_FAV",name:f.name}),setConfirmRmWithTimer(null)):setConfirmRmWithTimer(f.name)} style={{background:pending?"#ff444430":"none",border:"none",borderLeft:`1px solid ${pending?"#ff5555":T.border}`,padding:"8px 10px",color:pending?"#ff5555":T.textDim,fontSize:11,cursor:"pointer",minHeight:40,display:"flex",alignItems:"center",fontFamily:MONO,transition:"all 0.15s"}} onMouseEnter={e=>{if(!pending)e.currentTarget.style.color="#ff5555";}} onMouseLeave={e=>{if(!pending)e.currentTarget.style.color=T.textDim;}}>{pending?"remove":"✕"}</button>
                     </div>
                   );
                 })}
@@ -1362,49 +1016,30 @@ function App() {
 
         {/* TASKS */}
         <div style={{marginBottom:12}}>
-          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
-            <div style={{fontSize:10, color:T.textDim, letterSpacing:2, fontFamily:"'Space Mono',monospace"}}>
-              TASKS{tasks.length > 0 ? ` · ${tasks.filter(t => t.done).length}/${tasks.length} done` : ""}
-            </div>
-            {tasks.length > 1 && (
-              <button
-                onClick={() => { dispatch({ type: "DISTRIBUTE" }); showToast("Distributed ✓"); }}
-                style={{background:"none", border:`1px solid ${T.borderMid}`, borderRadius:7, padding:"4px 10px", color:T.textMuted, fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer", letterSpacing:0.5, transition:"all 0.15s"}}
-                onMouseEnter={e => { e.currentTarget.style.borderColor="#4ECDC4"; e.currentTarget.style.color="#4ECDC4"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor=T.borderMid; e.currentTarget.style.color=T.textMuted; }}
-              >⇄ distribute</button>
-            )}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,fontFamily:MONO}}>TASKS{tasks.length>0?` · ${tasks.filter(t=>t.done).length}/${tasks.length} done`:""}</div>
+            {tasks.length>1&&<button onClick={()=>{dispatch({type:"DISTRIBUTE"});showToast("Distributed ✓");}} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"4px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>⇄ distribute</button>}
           </div>
-
-          {tasks.length === 0 && (
-            <div style={{textAlign:"center", padding:"28px 0 20px", borderRadius:12, border:`1px dashed ${T.border}`}}>
-              <div style={{fontSize:24, marginBottom:8}}>📋</div>
-              <div style={{fontSize:11, color:T.textFaint, letterSpacing:1}}>No tasks yet</div>
-              <div style={{fontSize:10, color:T.textFaint, opacity:0.6, marginTop:4}}>Add one below ↓</div>
+          {tasks.length===0&&(
+            <div style={{textAlign:"center",padding:"28px 0 20px",borderRadius:12,border:`1px dashed ${T.border}`}}>
+              <div style={{fontSize:24,marginBottom:8}}>📋</div>
+              <div style={{fontSize:11,color:T.textFaint,letterSpacing:1}}>No tasks yet</div>
+              <div style={{fontSize:10,color:T.textFaint,opacity:0.6,marginTop:4}}>Add one below ↓</div>
             </div>
           )}
-
-          <div ref={taskListRef} style={{opacity: longDragIdx !== null ? 0.92 : 1, transition:"opacity 0.2s"}}>
-            {tasks.map((t, i) => {
-              const isFloating = longDragIdx === i;
-              const isOver     = dragOver === i;
+          <div ref={taskListRef} style={{opacity:longDragIdx!==null?.92:1,transition:"opacity 0.2s"}}>
+            {tasks.map((t,i)=>{
+              const isFloat=longDragIdx===i, isOver=dragOver===i;
               return (
-                <div key={t.id} data-taskcard={i}
-                  style={{opacity: isFloating?0.25:1, transform: isOver?"translateY(-3px) scale(1.01)":isFloating?"scale(0.97)":"none", transition:"opacity 0.2s,transform 0.15s", filter: isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none", borderRadius:12}}>
-                  <TaskCard task={t} stepMinutes={step} dayLen={dayLen} tasks={tasks} T={T}
-                    onChange={patch => dispatch({ type: "UPD_TASK", id: t.id, patch })}
-                    onDelete={() => dispatch({ type: "DEL_TASK", id: t.id })}
-                    onEdit={() => setEditTask({ ...t })}
-                    onLock={() => dispatch({ type: "UPD_TASK", id: t.id, patch: { locked: !t.locked } })}
-                    isFav={favs.some(f => f.name.toLowerCase() === t.name.toLowerCase())}
-                    onFav={() => {
-                      if (favs.some(f => f.name.toLowerCase() === t.name.toLowerCase()))
-                        dispatch({ type: "DEL_FAV", name: t.name });
-                      else
-                        dispatch({ type: "ADD_FAV", task: t });
-                    }}
-                    onLongPressStart={e => startLongDrag(i, e)}
-                    onLongPressEnd={cancelLongPress}
+                <div key={t.id} data-taskcard={i} style={{opacity:isFloat?.25:1,transform:isOver?"translateY(-3px) scale(1.01)":isFloat?"scale(0.97)":"none",transition:"opacity 0.2s,transform 0.15s",filter:isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none",borderRadius:12}}>
+                  <TaskCard task={t} stepMinutes={step} dayLen={dl} tasks={tasks} T={T}
+                    onChange={p=>dispatch({type:"UPD_TASK",id:t.id,patch:p})}
+                    onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
+                    onEdit={()=>setEditTask({...t})}
+                    onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
+                    isFav={favs.some(f=>nameLc(f.name)===nameLc(t.name))}
+                    onFav={()=>dispatch({type:favs.some(f=>nameLc(f.name)===nameLc(t.name))?"DEL_FAV":"ADD_FAV",name:t.name,task:t})}
+                    onLongPressStart={e=>startLongDrag(i,e)} onLongPressEnd={cancelLongPress}
                   />
                 </div>
               );
@@ -1412,61 +1047,29 @@ function App() {
           </div>
         </div>
 
-        {/* FLOATING DRAG CARD */}
-        {longDragIdx !== null && tasks[longDragIdx] && (() => {
-          const t = tasks[longDragIdx];
-          return (
-            <div style={{position:"fixed", left:dragPos.x-140, top:dragPos.y-28, width:280, zIndex:300, pointerEvents:"none", animation:"floatIn 0.15s ease", filter:`drop-shadow(0 8px 24px ${t.color}66)`}}>
-              <div style={{background:T.bgCard, border:`2px solid ${t.color}`, borderRadius:12, padding:"10px 14px", display:"flex", alignItems:"center", gap:8, transform:"rotate(-1.5deg) scale(1.04)"}}>
-                <div style={{width:12, height:12, borderRadius:"50%", background:t.color, boxShadow:`0 0 8px ${t.color}`}}/>
-                <span style={{fontFamily:"'Space Mono',monospace", fontSize:12, color:T.text, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{t.name}</span>
-                <span style={{fontFamily:"'Space Mono',monospace", fontSize:11, color:t.color, fontWeight:"bold"}}>{formatHours(t.hours)}</span>
-              </div>
+        {longDragIdx!==null&&tasks[longDragIdx]&&(()=>{const t=tasks[longDragIdx];return(
+          <div style={{position:"fixed",left:dragPos.x-140,top:dragPos.y-28,width:280,zIndex:300,pointerEvents:"none",animation:"floatIn 0.15s ease",filter:`drop-shadow(0 8px 24px ${t.color}66)`}}>
+            <div style={{background:T.bgCard,border:`2px solid ${t.color}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,transform:"rotate(-1.5deg) scale(1.04)"}}>
+              <div style={{width:12,height:12,borderRadius:"50%",background:t.color,boxShadow:`0 0 8px ${t.color}`}}/>
+              <span style={{fontFamily:MONO,fontSize:12,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
+              <span style={{fontFamily:MONO,fontSize:11,color:t.color,fontWeight:"bold"}}>{formatHours(t.hours)}</span>
             </div>
-          );
-        })()}
+          </div>
+        );})()}
 
         {/* ADD TASK */}
-        <div style={{display:"flex", gap:8, marginBottom:24}}>
-          <input ref={inputRef} value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addTask()}
-            placeholder="Add a task…"
-            style={{flex:1, background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:10, padding:"13px 16px", color:T.text, fontFamily:"'Space Mono',monospace", fontSize:14, transition:"border-color 0.2s"}}
-            onFocus={e => e.target.style.borderColor = "#FF6B2B"}
-            onBlur={e  => e.target.style.borderColor = T.border}
-          />
-          <button onClick={() => addTask()}
-            style={{background:"#FF6B2B", border:"none", borderRadius:10, padding:"13px 18px", color:"#000", fontFamily:"'Bebas Neue',sans-serif", fontSize:18, letterSpacing:1, flexShrink:0, minWidth:70, minHeight:52, transition:"opacity 0.1s"}}
-            onTouchStart={e => e.currentTarget.style.opacity = "0.75"}
-            onTouchEnd={e   => e.currentTarget.style.opacity = "1"}
-            onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-          >ADD</button>
+        <div style={{display:"flex",gap:8,marginBottom:24}}>
+          <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Add a task…" style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:MONO,fontSize:14,transition:"border-color 0.2s"}} onFocus={e=>e.target.style.borderColor="#FF6B2B"} onBlur={e=>e.target.style.borderColor=T.border}/>
+          <button onClick={()=>addTask()} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:BEBAS,fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>ADD</button>
         </div>
       </div>
 
-      {/* EDIT MODAL */}
-      {editTask && (
-        <EditModal task={editTask} T={T}
-          onSave={patch => { dispatch({ type: "UPD_TASK", id: editTask.id, patch }); setEditTask(null); showToast("Task updated ✓"); }}
-          onClose={() => setEditTask(null)}/>
-      )}
-
-      {/* TOAST */}
-      {toast && (
-        <div style={{position:"fixed", bottom:"calc(20px + env(safe-area-inset-bottom,0px))", left:"50%", transform:"translateX(-50%)", zIndex:200, background: toast.type==="err"?"#ff444422":"#FF6B2B22", border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`, borderRadius:24, padding:"12px 22px", fontFamily:"'Space Mono',monospace", fontSize:12, color: toast.type==="err"?"#ff7777":"#FF6B2B", animation:"toastIn 0.2s ease", whiteSpace:"nowrap", backdropFilter:"blur(8px)"}}>
-          {toast.msg}
-        </div>
-      )}
+      {editTask&&<EditModal task={editTask} T={T} onSave={p=>{dispatch({type:"UPD_TASK",id:editTask.id,patch:p});setEditTask(null);showToast("Task updated ✓");}} onClose={()=>setEditTask(null)}/>}
+      {showSync&&<SyncModal T={T} dark={dark} state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
+      {toast&&<div style={{position:"fixed",bottom:"calc(20px + env(safe-area-inset-bottom,0px))",left:"50%",transform:"translateX(-50%)",zIndex:200,background:toast.type==="err"?"#ff444422":"#FF6B2B22",border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`,borderRadius:24,padding:"12px 22px",fontFamily:MONO,fontSize:12,color:toast.type==="err"?"#ff7777":"#FF6B2B",animation:"toastIn 0.2s ease",whiteSpace:"nowrap",backdropFilter:"blur(8px)"}}>{toast.msg}</div>}
     </div>
   );
 }
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SECTION 9 — BOOTSTRAP
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 migrateOldData();
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
