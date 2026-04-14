@@ -41,6 +41,22 @@ input[type="text"], input[type="color"], textarea { font-size: 16px !important; 
 const { useState, useRef, useEffect, useCallback, useReducer } = React;
 
 const STORAGE_KEY = "sliders_data";
+const WEEK_KEY = "sliders_week_v1";
+const DAYS_HU = ["Hétfő","Kedd","Szerda","Csütörtök","Péntek","Szombat","Vasárnap"];
+const DAYS_SHORT = ["H","K","SZ","CS","P","SZ","V"];
+
+function loadWeek() {
+  try { const r = localStorage.getItem(WEEK_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveWeek(w) { try { localStorage.setItem(WEEK_KEY, JSON.stringify(w)); } catch {} }
+function initWeek() {
+  const saved = loadWeek();
+  // 7 days, each with tasks array and optional note
+  return saved || Array.from({length:7}, (_,i) => ({ dayIdx:i, tasks:[], note:"" }));
+}
+function weekTotalHours(dayData) {
+  return dayData.tasks.reduce((s,t)=>s+(t.hours||0),0);
+}
 const PALETTE = ["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
 const STEPS = [{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30}];
 const DARK  = { bg:"#1c1c1e", bgCard:"#2a2a2e", bgInput:"#323236", bgSlider:"#484850", border:"#505058", borderMid:"#626268", text:"#ffffff", textSub:"#e8e8e8", textMuted:"#c0c0c0", textDim:"#a0a0a0", textFaint:"#888890", donutFree:"#3a3a3e", tc:"#1c1c1e" };
@@ -787,6 +803,218 @@ function Timeline({ tasks, T, dayLen, dayStart }) {
   );
 }
 
+// ── Week View ─────────────────────────────────────────────────────────────────
+
+function WeekTaskRow({ task, T, stepMinutes, dayTotalHours, onHoursChange, onDelete }) {
+  const pct = dayTotalHours > 0 ? Math.round(task.hours / dayTotalHours * 100) : 0;
+  return (
+    <div style={{marginBottom:6}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+        <div style={{width:8,height:8,borderRadius:"50%",background:task.color,flexShrink:0,boxShadow:`0 0 4px ${task.color}66`}}/>
+        <span style={{fontFamily:MONO,fontSize:11,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.name}</span>
+        <span style={{fontFamily:MONO,fontSize:10,color:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
+        <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint,flexShrink:0,minWidth:26,textAlign:"right"}}>{pct}%</span>
+        <button onClick={onDelete} style={{background:"none",border:"none",width:24,height:24,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:T.textDim,fontSize:10,cursor:"pointer",flexShrink:0,padding:0}} onMouseEnter={e=>e.currentTarget.style.color="#ff5555"} onMouseLeave={e=>e.currentTarget.style.color=T.textDim}>✕</button>
+      </div>
+      <Slider value={task.hours} max={Math.max(task.hours, 12)} step={stepMinutes} color={task.color} locked={false} onChange={onHoursChange}/>
+    </div>
+  );
+}
+
+function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const total = weekTotalHours(dayData);
+  const taskCount = dayData.tasks.length;
+  const hasNote = dayData.note && dayData.note.trim().length > 0;
+
+  const copyFromToday = () => {
+    if (!todayTasks.length) return;
+    const copied = todayTasks.map(t => ({...t, id: Date.now() + Math.random(), done: false}));
+    onUpdate({ tasks: copied });
+  };
+
+  const addTask = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const color = PALETTE[dayData.tasks.length % PALETTE.length];
+    const newTask = { id: Date.now() + Math.random(), name, hours: 1, originalHours: 1, color, locked: false, actual: 0, done: false };
+    onUpdate({ tasks: [...dayData.tasks, newTask] });
+    setNewName("");
+  };
+
+  const updateTaskHours = (taskId, hours) => {
+    onUpdate({ tasks: dayData.tasks.map(t => t.id === taskId ? {...t, hours, originalHours: hours} : t) });
+  };
+
+  const deleteTask = (taskId) => {
+    onUpdate({ tasks: dayData.tasks.filter(t => t.id !== taskId) });
+  };
+
+  const updateNote = (note) => onUpdate({ note });
+
+  // Compact bar: colored segments proportional to hours
+  const segments = dayData.tasks.filter(t => t.hours > 0);
+  const segTotal = segments.reduce((s,t)=>s+t.hours,0);
+
+  return (
+    <div style={{
+      background: T.bgCard,
+      border: `1px solid ${isToday ? "#FF6B2B" : T.border}`,
+      borderRadius: 12,
+      overflow: "hidden",
+      transition: "border-color 0.2s",
+    }}>
+      {/* Day header — always visible */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        style={{
+          width: "100%", background: "none", border: "none", padding: "11px 14px 9px",
+          display: "flex", alignItems: "center", gap: 10, cursor: "pointer", textAlign: "left",
+        }}
+      >
+        {/* Day name */}
+        <div style={{flexShrink:0, minWidth:72}}>
+          <div style={{fontFamily:BEBAS, fontSize:16, letterSpacing:1.5, color: isToday ? "#FF6B2B" : T.text, lineHeight:1}}>{DAYS_HU[dayIdx]}</div>
+          {isToday && <div style={{fontFamily:MONO, fontSize:8, color:"#FF6B2B", letterSpacing:1, marginTop:1}}>MA</div>}
+        </div>
+
+        {/* Compact bar */}
+        <div style={{flex:1, height:6, borderRadius:4, background:T.bgSlider, overflow:"hidden", position:"relative"}}>
+          {segTotal > 0 ? segments.map((t,i) => {
+            const left = segments.slice(0,i).reduce((s,x)=>s+x.hours,0) / segTotal * 100;
+            const w = t.hours / segTotal * 100;
+            return <div key={t.id} style={{position:"absolute",left:`${left}%`,width:`${w}%`,top:0,bottom:0,background:t.color}}/>;
+          }) : null}
+        </div>
+
+        {/* Stats */}
+        <div style={{fontFamily:MONO, fontSize:10, color: total > 0 ? T.textSub : T.textFaint, flexShrink:0, textAlign:"right", minWidth:52}}>
+          {total > 0 ? <><span style={{color:"#FF6B2B",fontWeight:"bold"}}>{formatHours(total)}</span></> : <span style={{opacity:0.4}}>—</span>}
+        </div>
+        {taskCount > 0 && <div style={{fontFamily:MONO, fontSize:9, color:T.textFaint, flexShrink:0, minWidth:20, textAlign:"right"}}>{taskCount}✓</div>}
+        {hasNote && <span style={{fontSize:10, flexShrink:0}}>📝</span>}
+        <span style={{color:T.textFaint, fontSize:10, flexShrink:0}}>{expanded?"▲":"▼"}</span>
+      </button>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div style={{borderTop:`1px solid ${T.border}`, padding:"12px 14px 14px", animation:"slideIn 0.15s ease"}}>
+
+          {/* Tasks */}
+          {dayData.tasks.length > 0 && (
+            <div style={{marginBottom:12}}>
+              {dayData.tasks.map(t => (
+                <WeekTaskRow key={t.id} task={t} T={T} stepMinutes={step}
+                  dayTotalHours={total}
+                  onHoursChange={h => updateTaskHours(t.id, h)}
+                  onDelete={() => deleteTask(t.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Add task row */}
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            <input
+              value={newName}
+              onChange={e=>setNewName(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&addTask()}
+              placeholder="Feladat hozzáadása…"
+              style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:12,outline:"none"}}
+              onFocus={e=>e.target.style.borderColor="#FF6B2B"}
+              onBlur={e=>e.target.style.borderColor=T.border}
+            />
+            <button onClick={addTask} style={{background:"#FF6B2B",border:"none",borderRadius:8,padding:"8px 14px",color:"#000",fontFamily:BEBAS,fontSize:15,letterSpacing:1,flexShrink:0,minWidth:52,cursor:"pointer"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"}>ADD</button>
+          </div>
+
+          {/* Copy from today + Note */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:dayData.note!==undefined?10:0}}>
+            {todayTasks.length > 0 && (
+              <button onClick={copyFromToday} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"5px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>
+                ⎘ másolás a mai napból
+              </button>
+            )}
+            {dayData.tasks.length > 0 && (
+              <button onClick={()=>onUpdate({tasks:[]})} style={{background:"none",border:`1px solid #cc333344`,borderRadius:7,padding:"5px 10px",color:"#cc5555",fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#ff5555";e.currentTarget.style.color="#ff5555";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#cc333344";e.currentTarget.style.color="#cc5555";}}>
+                ✕ törlés mind
+              </button>
+            )}
+          </div>
+
+          {/* Note */}
+          <textarea
+            value={dayData.note || ""}
+            onChange={e => updateNote(e.target.value)}
+            placeholder="Megjegyzés a naphoz…"
+            rows={2}
+            style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:11,resize:"none",outline:"none",lineHeight:1.5,marginTop:8}}
+            onFocus={e=>e.target.style.borderColor="#4ECDC4"}
+            onBlur={e=>e.target.style.borderColor=T.border}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeekView({ T, dark, step, todayTasks }) {
+  const [week, setWeek] = React.useState(initWeek);
+
+  React.useEffect(() => { saveWeek(week); }, [week]);
+
+  const updateDay = (dayIdx, patch) => {
+    setWeek(prev => prev.map((d, i) => i === dayIdx ? {...d, ...patch} : d));
+  };
+
+  // "Today" = current day of week, Mon=0 … Sun=6 (Hungarian convention)
+  const todayDowRaw = new Date().getDay(); // 0=Sun
+  const todayDow = todayDowRaw === 0 ? 6 : todayDowRaw - 1; // convert to Mon=0
+
+  const weekTotal = week.reduce((s, d) => s + weekTotalHours(d), 0);
+  const filledDays = week.filter(d => d.tasks.length > 0).length;
+
+  return (
+    <div style={{padding:"0 16px", paddingBottom:100}}>
+      {/* Week summary bar */}
+      <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+        <div>
+          <div style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:"#FF6B2B",lineHeight:1}}>{formatHours(weekTotal)}</div>
+          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>HETI ÖSSZESEN</div>
+        </div>
+        <div style={{flex:1, height:8, borderRadius:4, background:T.bgSlider, overflow:"hidden", display:"flex"}}>
+          {week.map((d,i) => {
+            const w = weekTotal > 0 ? (weekTotalHours(d) / weekTotal * 100) : (100/7);
+            const col = d.tasks[0]?.color || T.bgSlider;
+            return <div key={i} style={{width:`${w}%`,height:"100%",background:weekTotalHours(d)>0?col:T.bgSlider,borderRight:i<6?`1px solid ${T.bg}`:"none",opacity:weekTotalHours(d)>0?1:0.3,transition:"all 0.3s"}}/>;
+          })}
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{fontFamily:MONO,fontSize:13,color:T.textSub,fontWeight:"bold"}}>{filledDays}<span style={{fontSize:9,color:T.textFaint,fontWeight:"normal"}}>/7</span></div>
+          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>NAP TELI</div>
+        </div>
+      </div>
+
+      {/* Day cards */}
+      <div style={{display:"flex",flexDirection:"column",gap:7}}>
+        {week.map((dayData, dayIdx) => (
+          <DayCard
+            key={dayIdx}
+            dayData={dayData}
+            dayIdx={dayIdx}
+            T={T}
+            dark={dark}
+            step={step}
+            todayTasks={todayTasks}
+            isToday={dayIdx === todayDow}
+            onUpdate={patch => updateDay(dayIdx, patch)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
@@ -795,6 +1023,7 @@ function App() {
   const [confirmRm,setConfirmRm]=useState(null), [confirmReset,setConfirmReset]=useState(false);
   const [showSettings,setShowSettings]=useState(false), [showFavs,setShowFavs]=useState(false);
   const [showSync,setShowSync]=useState(false);
+  const [activeView,setActiveView]=useState("today"); // "today" | "week"
   const [dragOver,setDragOver]=useState(null), [longDragIdx,setLongDragIdx]=useState(null), [dragPos,setDragPos]=useState({x:0,y:0});
   const lpTimer=useRef(null), confirmRmTimer=useRef(null), taskListRef=useRef(), fileRef=useRef(), inputRef=useRef();
 
@@ -884,9 +1113,19 @@ function App() {
         <div style={{height:2,background:T.bgSlider,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${Math.min(100,(total/dl)*100)}%`,background:over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B",transition:"width 0.2s,background 0.2s",borderRadius:"0 2px 2px 0"}}/>
         </div>
+        {/* Tab bar */}
+        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`}}>
+          {[["today","⬡ TODAY"],["week","▦ WEEK"]].map(([v,label])=>(
+            <button key={v} onClick={()=>setActiveView(v)} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView===v?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView===v?"#FF6B2B":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{padding:"0 16px"}}>
+
+        {activeView==="week" ? null : (<React.Fragment>
 
         {/* DONUT + RING */}
         <div style={{margin:"12px 0",padding:"16px 16px 12px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14}}>
@@ -1051,7 +1290,12 @@ function App() {
           <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Add a task…" style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:MONO,fontSize:14,transition:"border-color 0.2s"}} onFocus={e=>e.target.style.borderColor="#FF6B2B"} onBlur={e=>e.target.style.borderColor=T.border}/>
           <button onClick={()=>addTask()} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:BEBAS,fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>ADD</button>
         </div>
+      </React.Fragment>)}
       </div>
+
+      {activeView==="week" && (
+        <WeekView T={T} dark={dark} step={step} todayTasks={tasks}/>
+      )}
 
       {editTask&&<EditModal task={editTask} T={T} onSave={p=>{dispatch({type:"UPD_TASK",id:editTask.id,patch:p});setEditTask(null);showToast("Task updated ✓");}} onClose={()=>setEditTask(null)}/>}
       {showSync&&<SyncModal T={T} dark={dark} state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
