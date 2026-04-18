@@ -58,6 +58,7 @@ function getTopUsed(n = 3) {
   const u = loadUsage();
   return Object.entries(u).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
 }
+function loadWeek() {
   try { const r = localStorage.getItem(WEEK_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 function saveWeek(w) { try { localStorage.setItem(WEEK_KEY, JSON.stringify(w)); } catch {} }
