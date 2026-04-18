@@ -45,7 +45,19 @@ const WEEK_KEY = "sliders_week_v1";
 const DAYS_HU = ["Hétfő","Kedd","Szerda","Csütörtök","Péntek","Szombat","Vasárnap"];
 const DAYS_SHORT = ["H","K","SZ","CS","P","SZ","V"];
 
-function loadWeek() {
+const USAGE_KEY = "sliders_task_usage";
+function loadUsage() { try { const r = localStorage.getItem(USAGE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; } }
+function saveUsage(u) { try { localStorage.setItem(USAGE_KEY, JSON.stringify(u)); } catch {} }
+function recordUsage(name) {
+  const u = loadUsage();
+  const key = name.toLowerCase().trim();
+  u[key] = (u[key] || 0) + 1;
+  saveUsage(u);
+}
+function getTopUsed(n = 3) {
+  const u = loadUsage();
+  return Object.entries(u).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
+}
   try { const r = localStorage.getItem(WEEK_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 function saveWeek(w) { try { localStorage.setItem(WEEK_KEY, JSON.stringify(w)); } catch {} }
@@ -278,7 +290,7 @@ function ringArcPath(a1, a2) {
 
 function RingTimeLabel({ hour, angleRad, color }) {
   const R=RING_RADIUS+22, lx=RING_CX+R*Math.cos(angleRad), ly=RING_CY+R*Math.sin(angleRad);
-  return <text x={lx} y={ly+4} textAnchor={lx<RING_CX-10?"end":lx>RING_CX+10?"start":"middle"} fill={color} fontSize={9} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{String(Math.floor(hour)).padStart(2,"0")}:{hour%1?"30":"00"}</text>;
+  return <text x={lx} y={ly+4} textAnchor={lx<RING_CX-10?"end":lx>RING_CX+10?"start":"middle"} fill={color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{String(Math.floor(hour)).padStart(2,"0")}:{hour%1?"30":"00"}</text>;
 }
 
 function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
@@ -345,8 +357,8 @@ function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
       <svg ref={svgRef} width={RING_SIZE} height={RING_SIZE} style={{display:"block",touchAction:"none",userSelect:"none",overflow:"visible"}} onPointerMove={onMove} onPointerUp={onUp}>
         <path d={FULL_CIRCLE_PATH} fill="none" stroke={T.bgSlider} strokeWidth={RING_STROKE} strokeLinecap="round"/>
         <path d={ringArcPath(dispStartA.current,dispEndA.current)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE} strokeLinecap="round" opacity={arcOp} style={{transition:"opacity 0.3s"}}/>
-        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={13} fontFamily={MONO} fontWeight="bold">{formatHours(dl)}</text>
-        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={9} fontFamily={MONO}>{timeRange}</text>
+        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={15} fontFamily={MONO} fontWeight="bold">{formatHours(dl)}</text>
+        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={11} fontFamily={MONO}>{timeRange}</text>
         <Handle pos={tS} color={RING_START_COLOR} which="start"/>
         <RingTimeLabel hour={dayStart} angleRad={dispStartA.current} color={RING_START_COLOR}/>
         <Handle pos={tE} color={RING_END_COLOR} which="end"/>
@@ -606,26 +618,23 @@ function Btn44({ onClick, danger, children, title }) {
 }
 
 function TaskCard({ task, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
-  const done=!!task.done, pct=dayLen>0?Math.round(task.hours/dayLen*100):0;
   const maxH=tasks.reduce((m,t)=>Math.max(m,t.hours),0), ratio=maxH>0?task.hours/maxH:1;
-  const sliderColor=done?"#555":adjustColor(task.color,(ratio-1)*15,(ratio-1)*55);
+  const sliderColor=adjustColor(task.color,(ratio-1)*15,(ratio-1)*55);
   return (
-    <div style={{background:T.bgCard,border:`1px solid ${done?"#404040":T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}} onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd} onContextMenu={e=>e.preventDefault()}>
+    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}} onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd} onContextMenu={e=>e.preventDefault()}>
       <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-        <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:12,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
-        <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:done?"#555":task.color,border:"none",flexShrink:0,boxShadow:done?"none":`0 0 6px ${task.color}88`,padding:0}}/>
-        <span onClick={onEdit} style={{fontFamily:MONO,fontSize:12,color:done?T.textFaint:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:done?"line-through":"none"}}>{task.name}</span>
-        <span style={{fontFamily:MONO,fontSize:11,color:done?T.textFaint:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
-        <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint,flexShrink:0,opacity:0.7}}>{pct}%</span>
+        <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:14,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
+        <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:task.color,border:"none",flexShrink:0,boxShadow:`0 0 6px ${task.color}88`,padding:0}}/>
+        <span onClick={onEdit} style={{fontFamily:MONO,fontSize:14,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
+        <span style={{fontFamily:MONO,fontSize:13,color:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
         <div style={{display:"flex",gap:0,flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
-          <Btn44 onClick={()=>onChange({done:!done})} title={done?"Undo":"Done"}><span style={{fontSize:12,opacity:done?1:0.3}}>{done?"✅":"☑️"}</span></Btn44>
           {!isFav&&<Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12,opacity:0.3}}>★</span></Btn44>}
           <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}><span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span></Btn44>
           {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
         </div>
       </div>
       <div onPointerDown={e=>e.stopPropagation()}>
-        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked||done} onChange={h=>onChange({hours:h})}/>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked} onChange={h=>onChange({hours:h})}/>
       </div>
     </div>
   );
@@ -806,14 +815,12 @@ function Timeline({ tasks, T, dayLen, dayStart }) {
 // ── Week View ─────────────────────────────────────────────────────────────────
 
 function WeekTaskRow({ task, T, stepMinutes, dayTotalHours, onHoursChange, onDelete }) {
-  const pct = dayTotalHours > 0 ? Math.round(task.hours / dayTotalHours * 100) : 0;
   return (
     <div style={{marginBottom:6}}>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
         <div style={{width:8,height:8,borderRadius:"50%",background:task.color,flexShrink:0,boxShadow:`0 0 4px ${task.color}66`}}/>
         <span style={{fontFamily:MONO,fontSize:11,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.name}</span>
         <span style={{fontFamily:MONO,fontSize:10,color:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
-        <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint,flexShrink:0,minWidth:26,textAlign:"right"}}>{pct}%</span>
         <button onClick={onDelete} style={{background:"none",border:"none",width:24,height:24,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:T.textDim,fontSize:10,cursor:"pointer",flexShrink:0,padding:0}} onMouseEnter={e=>e.currentTarget.style.color="#ff5555"} onMouseLeave={e=>e.currentTarget.style.color=T.textDim}>✕</button>
       </div>
       <Slider value={task.hours} max={Math.max(task.hours, 12)} step={stepMinutes} color={task.color} locked={false} onChange={onHoursChange}/>
@@ -1023,8 +1030,9 @@ function App() {
   const [confirmRm,setConfirmRm]=useState(null), [confirmReset,setConfirmReset]=useState(false);
   const [showSettings,setShowSettings]=useState(false), [showFavs,setShowFavs]=useState(false);
   const [showSync,setShowSync]=useState(false);
-  const [activeView,setActiveView]=useState("today"); // "today" | "week"
+  const [activeView,setActiveView]=useState("today");
   const [dragOver,setDragOver]=useState(null), [longDragIdx,setLongDragIdx]=useState(null), [dragPos,setDragPos]=useState({x:0,y:0});
+  const [inputFocused,setInputFocused]=useState(false);
   const lpTimer=useRef(null), confirmRmTimer=useRef(null), taskListRef=useRef(), fileRef=useRef(), inputRef=useRef();
 
   const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
@@ -1046,6 +1054,7 @@ function App() {
     const name=(nameArg||newName).trim(); if(!name)return;
     if(tasks.some(t=>nameLc(t.name)===nameLc(name))){showToast("Task already exists","err");return;}
     dispatch({type:"ADD_TASK",name,color:colorArg,hours:hoursArg});
+    recordUsage(name);
     setConfirmRmWithTimer(null); setNewName(""); inputRef.current?.blur();
   };
 
@@ -1245,7 +1254,7 @@ function App() {
         {/* TASKS */}
         <div style={{marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,fontFamily:MONO}}>TASKS{tasks.length>0?` · ${tasks.filter(t=>t.done).length}/${tasks.length} done`:""}</div>
+            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,fontFamily:MONO}}>TASKS</div>
             {tasks.length>1&&<button onClick={()=>{dispatch({type:"DISTRIBUTE"});showToast("Distributed ✓");}} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"4px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>⇄ distribute</button>}
           </div>
           {tasks.length===0&&(
@@ -1286,10 +1295,30 @@ function App() {
         );})()}
 
         {/* ADD TASK */}
-        <div style={{display:"flex",gap:8,marginBottom:24}}>
-          <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Add a task…" style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:MONO,fontSize:14,transition:"border-color 0.2s"}} onFocus={e=>e.target.style.borderColor="#FF6B2B"} onBlur={e=>e.target.style.borderColor=T.border}/>
-          <button onClick={()=>addTask()} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:BEBAS,fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>ADD</button>
-        </div>
+        {(()=>{
+          const topUsed = getTopUsed(3);
+          const suggestions = topUsed.filter(name => !tasks.some(t=>nameLc(t.name)===name));
+          return (
+            <div style={{position:"relative",display:"flex",gap:8,marginBottom:24}}>
+              {inputFocused && suggestions.length > 0 && (
+                <div style={{position:"absolute",bottom:"calc(100% + 8px)",left:0,right:0,zIndex:50,display:"flex",gap:6,padding:"8px 10px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:`0 -4px 20px rgba(0,0,0,0.35)`,animation:"slideIn 0.15s ease",pointerEvents:"auto"}}>
+                  {suggestions.map(name=>{
+                    const fav=favs.find(f=>nameLc(f.name)===name);
+                    const color=fav?.color||PALETTE[0];
+                    return (
+                      <button key={name} onMouseDown={e=>{e.preventDefault(); addTask(name,fav?.color,fav?.hours);}} style={{flex:1,background:`${color}18`,border:`1px solid ${color}44`,borderRadius:8,padding:"7px 8px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",transition:"all 0.15s",minWidth:0,overflow:"hidden"}} onMouseEnter={e=>{e.currentTarget.style.background=`${color}30`;e.currentTarget.style.borderColor=`${color}88`;}} onMouseLeave={e=>{e.currentTarget.style.background=`${color}18`;e.currentTarget.style.borderColor=`${color}44`;}}>
+                        <div style={{width:7,height:7,borderRadius:"50%",background:color,flexShrink:0}}/>
+                        <span style={{fontFamily:MONO,fontSize:10,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name.length>12?name.slice(0,12)+"…":name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Add a task…" style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:MONO,fontSize:14,transition:"border-color 0.2s"}} onFocus={e=>{e.target.style.borderColor="#FF6B2B";setInputFocused(true);}} onBlur={e=>{e.target.style.borderColor=T.border;setTimeout(()=>setInputFocused(false),150);}}/>
+              <button onClick={()=>addTask()} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:BEBAS,fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>ADD</button>
+            </div>
+          );
+        })()}
       </React.Fragment>)}
       </div>
 
