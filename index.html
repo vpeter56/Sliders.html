@@ -90,6 +90,16 @@ function formatHours(h) {
   const m = Math.round(h * 60), hh = Math.floor(m / 60), mm = m % 60;
   return hh === 0 ? `${mm}m` : mm === 0 ? `${hh}h` : `${hh}h ${mm}m`;
 }
+function formatTime(h) {
+  const total = Math.round(((h % 24) + 24) % 24 * 60);
+  const hh = Math.floor(total / 60) % 24, mm = total % 60;
+  return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
+}
+function taskTimeRange(tasks, idx, dayStart) {
+  let cursor = dayStart;
+  for (let i = 0; i < idx; i++) cursor += tasks[i].hours || 0;
+  return { start: cursor, end: cursor + (tasks[idx].hours || 0) };
+}
 const snapToStep = (h, s) => Math.round(h * 60 / s) * s / 60;
 const calcDayLen = (s, e) => e >= s ? e - s : (24 - s) + e;
 
@@ -418,7 +428,7 @@ function calcOverflowAngles(tasks, dayLen) {
   return overlapSegs;
 }
 
-function Donut({ tasks, T, dayLen, onReorder }) {
+function Donut({ tasks, T, dayLen, dayStart, onReorder }) {
   const total=tasks.reduce((s,t)=>s+t.hours,0), unalloc=Math.max(0,dayLen-total);
   // For display: clamp each task to dayLen proportionally when over
   const displayTasks = total > dayLen + TOL
@@ -431,9 +441,18 @@ function Donut({ tasks, T, dayLen, onReorder }) {
   const segBright=h=>dayLen<=0?.35:Math.max(0.35,Math.min(1,0.35+0.65*(h/dayLen)*allSlices.length));
 
   const [dragSeg,setDragSeg]=useState(null), [overSeg,setOverSeg]=useState(null);
+  const [selectedId,setSelectedId]=useState(null);
   const lpRef=useRef(), svgRef=useRef(), wrapRef=useRef();
   const animA=useRef({}), tgtA=useRef({}), animRaf=useRef(null);
   const [,rerender]=useReducer(x=>x+1,0);
+
+  // Compute selected task info
+  const selectedTask = selectedId ? tasks.find(t=>t.id===selectedId) : null;
+  const selectedTimeRange = selectedTask ? (()=>{
+    const idx = tasks.findIndex(t=>t.id===selectedId);
+    let c = dayStart; for(let i=0;i<idx;i++) c+=tasks[i].hours||0;
+    return { start: c, end: c + selectedTask.hours };
+  })() : null;
 
   // FIX: init animA immediately to avoid first-frame pop
   const buildTargets = (slices, dl) => {
@@ -493,7 +512,7 @@ function Donut({ tasks, T, dayLen, onReorder }) {
 
   const onDown=i=>e=>{ if(allSlices[i].id==="free")return; e.preventDefault(); wrapRef.current?.setPointerCapture(e.pointerId); lpRef.current=setTimeout(()=>{ try{if(navigator.vibrate)navigator.vibrate([10,30,10])}catch{} setDragSeg(i); },LONG_PRESS_MS); };
   const onMove=e=>{ if(dragSeg===null)return; e.preventDefault(); const i=getSegIdx(e); setOverSeg(i!==null&&allSlices[i]?.id!=="free"&&i!==dragSeg?i:null); };
-  const onUp=()=>{ clearTimeout(lpRef.current); if(dragSeg!==null&&overSeg!==null&&overSeg!==dragSeg)onReorder(dragSeg,overSeg); setDragSeg(null);setOverSeg(null); };
+  const onUp=(i)=>()=>{ clearTimeout(lpRef.current); if(dragSeg!==null&&overSeg!==null&&overSeg!==dragSeg)onReorder(dragSeg,overSeg); if(dragSeg===null&&i!==undefined&&allSlices[i]?.id!=="free"){ const tid=allSlices[i].id; setSelectedId(prev=>prev===tid?null:tid); } setDragSeg(null);setOverSeg(null); };
   const onCancel=()=>{ clearTimeout(lpRef.current); setDragSeg(null);setOverSeg(null); };
 
   // Compute overflow overlay: angle where tasks overflow dayLen
@@ -519,10 +538,11 @@ function Donut({ tasks, T, dayLen, onReorder }) {
         {segs.map((seg,i)=>{
           if (!seg) return null;
           const {slice}=seg, isFree=slice.id==="free", isDrag=dragSeg===i, isOverSeg=overSeg===i;
+          const isSelected=!isFree&&selectedId===slice.id;
           const bright=isFree?gb:gb*segBright(slice.hours);
           return (
-            <g key={slice.id||i} style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`,transform:`scale(${isDrag?1.08:isOverSeg?.94:1})`,transition:dragSeg!==null?"transform 0.15s ease":"transform 0.25s ease",cursor:isFree?"default":dragSeg!==null?"grabbing":"grab",opacity:isDrag?1:(slice.done?.4:1)*bright}} pointerEvents={isFree?"none":"auto"} onPointerDown={isFree?undefined:onDown(i)}>
-              <path d={buildSegPath(seg.startA,seg.sw)} fill={isOverSeg?"#888":(slice.done?"#444":slice.color)} stroke={isDrag?slice.color:T.bg} strokeWidth={isDrag?2.5:1.5} style={{filter:isDrag?`drop-shadow(0 0 6px ${slice.color}88)`:"none",transition:"fill 0.3s,opacity 0.3s,filter 0.15s"}}/>
+            <g key={slice.id||i} style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`,transform:`scale(${isDrag?1.08:isSelected?1.12:isOverSeg?.94:1})`,transition:dragSeg!==null?"transform 0.15s ease":"transform 0.25s ease",cursor:isFree?"default":dragSeg!==null?"grabbing":"pointer",opacity:isDrag?1:(slice.done?.4:1)*bright}} pointerEvents={isFree?"none":"auto"} onPointerDown={isFree?undefined:onDown(i)} onPointerUp={isFree?undefined:onUp(i)}>
+              <path d={buildSegPath(seg.startA,seg.sw)} fill={isOverSeg?"#888":(slice.done?"#444":slice.color)} stroke={isSelected?slice.color:(isDrag?slice.color:T.bg)} strokeWidth={isSelected?3:(isDrag?2.5:1.5)} style={{filter:isSelected?`drop-shadow(0 0 8px ${slice.color}cc) drop-shadow(0 0 3px ${slice.color})`:(isDrag?`drop-shadow(0 0 6px ${slice.color}88)`:"none"),transition:"fill 0.3s,opacity 0.3s,filter 0.15s,stroke-width 0.15s"}}/>
             </g>
           );
         })}
@@ -570,8 +590,14 @@ function Donut({ tasks, T, dayLen, onReorder }) {
         })()}
 
         <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_INNER} fill={T.bg} style={{pointerEvents:"none"}}/>
-        <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={isOver?"#ff6060":T.text} fontSize={12} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatHours(total)}</text>
-        <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"left"}</text>
+        {selectedTask && selectedTimeRange ? (<>
+          <text x={DONUT_CX} y={DONUT_CY-13} textAnchor="middle" fill={selectedTask.color} fontSize={8} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none",transition:"fill 0.2s"}}>{selectedTask.name.length>9?selectedTask.name.slice(0,9)+"…":selectedTask.name}</text>
+          <text x={DONUT_CX} y={DONUT_CY+1} textAnchor="middle" fill={selectedTask.color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatTime(selectedTimeRange.start)}</text>
+          <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fill={selectedTask.color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatTime(selectedTimeRange.end)}</text>
+        </>) : (<>
+          <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={isOver?"#ff6060":T.text} fontSize={12} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatHours(total)}</text>
+          <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"left"}</text>
+        </>)}
       </svg>
     </div>
   );
@@ -618,23 +644,29 @@ function Btn44({ onClick, danger, children, title }) {
   return <button onClick={onClick} title={title} style={{background:"none",border:"none",width:36,height:36,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"background 0.15s"}} onTouchStart={e=>e.currentTarget.style.background=bg} onTouchEnd={e=>e.currentTarget.style.background="none"} onMouseEnter={e=>e.currentTarget.style.background=bg} onMouseLeave={e=>e.currentTarget.style.background="none"}>{children}</button>;
 }
 
-function TaskCard({ task, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
+function TaskCard({ task, taskStart, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
   const maxH=tasks.reduce((m,t)=>Math.max(m,t.hours),0), ratio=maxH>0?task.hours/maxH:1;
   const sliderColor=adjustColor(task.color,(ratio-1)*15,(ratio-1)*55);
+  const taskEnd = taskStart + task.hours;
   return (
     <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}} onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd} onContextMenu={e=>e.preventDefault()}>
-      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
         <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:14,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
         <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:task.color,border:"none",flexShrink:0,boxShadow:`0 0 6px ${task.color}88`,padding:0}}/>
-        <span onClick={onEdit} style={{fontFamily:MONO,fontSize:14,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
-        <span style={{fontFamily:MONO,fontSize:13,color:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <span onClick={onEdit} style={{fontFamily:MONO,fontSize:14,color:T.text,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:1}}>
+            <span style={{fontFamily:MONO,fontSize:9,color:task.color,opacity:0.85}}>{formatTime(taskStart)}</span>
+            <span style={{fontFamily:MONO,fontSize:9,color:task.color,opacity:0.85}}>{formatTime(taskEnd)}</span>
+          </div>
+        </div>
         <div style={{display:"flex",gap:0,flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
           {!isFav&&<Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12,opacity:0.3}}>★</span></Btn44>}
           <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}><span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span></Btn44>
           {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
         </div>
       </div>
-      <div onPointerDown={e=>e.stopPropagation()}>
+      <div onPointerDown={e=>e.stopPropagation()} style={{marginBottom:2}}>
         <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked} onChange={h=>onChange({hours:h})}/>
       </div>
     </div>
@@ -1142,16 +1174,20 @@ function App() {
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{position:"relative",width:220,height:220,flexShrink:0,margin:"14px 16px"}}>
               <CircularDaySlider dayStart={dayStart} dayEnd={dayEnd} T={T} onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}/>
-              <Donut tasks={tasks} T={T} dayLen={dl} onReorder={(f,t)=>dispatch({type:"REORDER_TASKS",from:f,to:t})}/>
+              <Donut tasks={tasks} T={T} dayLen={dl} dayStart={dayStart} onReorder={(f,t)=>dispatch({type:"REORDER_TASKS",from:f,to:t})}/>
             </div>
             <div style={{flex:1,overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:0}}>
-              {tasks.map(t=>{
+              {tasks.map((t,i)=>{
                 const pct=dl>0?Math.max(2,(t.hours/dl)*100):0, c=t.done?"#555":t.color;
+                const {start:tStart,end:tEnd}=taskTimeRange(tasks,i,dayStart);
                 return (
                   <div key={t.id} style={{marginBottom:7,opacity:t.done?.4:1,transition:"opacity 0.2s"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
-                      <span style={{fontSize:10,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",maxWidth:"65%",fontFamily:MONO}}>{t.name}</span>
-                      <span style={{fontSize:9,color:c,flexShrink:0,fontFamily:MONO,opacity:0.9}}>{formatHours(t.hours)}</span>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:1}}>
+                      <span style={{fontSize:10,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",maxWidth:"100%",fontFamily:MONO}}>{t.name}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                      <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tStart)}</span>
+                      <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tEnd)}</span>
                     </div>
                     <div style={{height:4,borderRadius:3,background:T.bgSlider,overflow:"hidden"}}>
                       <div style={{height:"100%",width:`${pct}%`,borderRadius:3,background:c,boxShadow:t.done?"none":`0 0 6px ${c}66`,transition:"width 0.3s"}}/>
@@ -1267,10 +1303,11 @@ function App() {
           )}
           <div ref={taskListRef} style={{opacity:longDragIdx!==null?.92:1,transition:"opacity 0.2s"}}>
             {tasks.map((t,i)=>{
+              const tStart=(()=>{let c=dayStart;for(let j=0;j<i;j++)c+=tasks[j].hours||0;return c;})();
               const isFloat=longDragIdx===i, isOver=dragOver===i;
               return (
                 <div key={t.id} data-taskcard={i} style={{opacity:isFloat?.25:1,transform:isOver?"translateY(-3px) scale(1.01)":isFloat?"scale(0.97)":"none",transition:"opacity 0.2s,transform 0.15s",filter:isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none",borderRadius:12}}>
-                  <TaskCard task={t} stepMinutes={step} dayLen={dl} tasks={tasks} T={T}
+                  <TaskCard task={t} taskStart={tStart} stepMinutes={step} dayLen={dl} tasks={tasks} T={T}
                     onChange={p=>dispatch({type:"UPD_TASK",id:t.id,patch:p})}
                     onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
                     onEdit={()=>setEditTask({...t})}
