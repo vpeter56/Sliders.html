@@ -42,8 +42,8 @@ const { useState, useRef, useEffect, useCallback, useReducer } = React;
 
 const STORAGE_KEY = "sliders_data";
 const WEEK_KEY = "sliders_week_v1";
-const DAYS_HU = ["Hétfő","Kedd","Szerda","Csütörtök","Péntek","Szombat","Vasárnap"];
-const DAYS_SHORT = ["H","K","SZ","CS","P","SZ","V"];
+const DAYS_HU = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DAYS_SHORT = ["M","T","W","Th","F","Sa","Su"];
 
 const USAGE_KEY = "sliders_task_usage";
 function loadUsage() { try { const r = localStorage.getItem(USAGE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; } }
@@ -62,6 +62,50 @@ function loadWeek() {
   try { const r = localStorage.getItem(WEEK_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 function saveWeek(w) { try { localStorage.setItem(WEEK_KEY, JSON.stringify(w)); } catch {} }
+
+function dateStr(d) { const dd = d instanceof Date ? d : new Date(d); return `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`; }
+function todayStr() { return dateStr(new Date()); }
+function tomorrowStr() { const d = new Date(); d.setDate(d.getDate()+1); return dateStr(d); }
+function formatDateLabel(str) {
+  if (!str) return "—";
+  const d = new Date(str + "T00:00:00");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  return `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+}
+function formatDateShort(str) {
+  if (!str) return "—";
+  const d = new Date(str + "T00:00:00");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+// Per-date storage
+const DAY_KEY = ds => `sliders_day_${ds}`;
+function loadDateState(ds) {
+  try {
+    const r = localStorage.getItem(DAY_KEY(ds));
+    if (r) return JSON.parse(r);
+    // Migration: today falls back to legacy key
+    if (ds === todayStr()) { const old = localStorage.getItem(STORAGE_KEY); if (old) return JSON.parse(old); }
+    return null;
+  } catch { return null; }
+}
+function saveDateState(ds, s) { try { localStorage.setItem(DAY_KEY(ds), JSON.stringify(s)); } catch {} }
+function getDatesWithTasks() {
+  const result = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("sliders_day_")) {
+        const ds = key.replace("sliders_day_", "");
+        const data = JSON.parse(localStorage.getItem(key));
+        if (data?.tasks?.length > 0) result[ds] = data.tasks;
+      }
+    }
+  } catch {}
+  return result;
+}
+
 function initWeek() {
   const saved = loadWeek();
   // 7 days, each with tasks array and optional note
@@ -199,8 +243,11 @@ function adjustColor(hex, ld, sd=0) {
 // ── State ─────────────────────────────────────────────────────────────────────
 
 function initState() {
-  const s = loadState();
+  const s = loadDateState(todayStr()) || loadState();
   return { tasks:s?.tasks??DEFAULT_TASKS, favs:s?.favs??[], step:s?.step??10, dark:s?.dark??true, showTL:s?.showTL??false, dayStart:s?.dayStart??10.5, dayEnd:s?.dayEnd??16 };
+}
+function blankDayState(base) {
+  return { tasks:[], favs:base.favs, step:base.step, dark:base.dark, showTL:base.showTL, dayStart:base.dayStart, dayEnd:base.dayEnd };
 }
 
 const nameLc = n => n.toLowerCase();
@@ -596,7 +643,7 @@ function Donut({ tasks, T, dayLen, dayStart, onReorder }) {
           <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fill={selectedTask.color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatTime(selectedTimeRange.end)}</text>
         </>) : (<>
           <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={isOver?"#ff6060":T.text} fontSize={12} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatHours(total)}</text>
-          <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"left"}</text>
+          <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"allocated"}</text>
         </>)}
       </svg>
     </div>
@@ -673,12 +720,14 @@ function TaskCard({ task, taskStart, stepMinutes, dayLen, tasks, T, onChange, on
   );
 }
 
-function EditModal({ task, T, onSave, onClose }) {
+function EditModal({ task, T, onSave, onClose, onSchedule }) {
   const [name,setName]=useState(task.name), [color,setColor]=useState(task.color);
+  const [showSched,setShowSched]=useState(false), [schedDate,setSchedDate]=useState(tomorrowStr());
   const save=()=>onSave({name:name.trim()||task.name,color});
+  const doSchedule=()=>{ if(schedDate) onSchedule(schedDate); };
   return (
     <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24}}>
+      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24,maxHeight:"92dvh",overflowY:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <span style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:T.text}}>EDIT TASK</span>
           <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -689,6 +738,33 @@ function EditModal({ task, T, onSave, onClose }) {
         <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
           {PALETTE.map(c=><button key={c} onClick={()=>setColor(c)} style={{width:36,height:36,borderRadius:"50%",background:c,border:color===c?`3px solid ${T.text}`:"2px solid transparent",padding:0,boxShadow:color===c?`0 0 0 2px ${T.bg}, 0 0 0 4px ${c}`:"none",transition:"all 0.15s"}}/>)}
         </div>
+
+        {/* ── Schedule section ─────────────────────────────── */}
+        <div style={{marginBottom:20}}>
+          <button onClick={()=>setShowSched(s=>!s)} style={{width:"100%",background:showSched?`${color}18`:"none",border:`1px solid ${showSched?color:T.borderMid}`,borderRadius:10,padding:"11px 16px",color:showSched?color:T.textMuted,fontFamily:MONO,fontSize:11,letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",transition:"all 0.2s"}}>
+            <span>📅 SCHEDULE FOR ANOTHER DAY</span>
+            <span style={{fontSize:11}}>{showSched?"▲":"▼"}</span>
+          </button>
+          {showSched&&(
+            <div style={{marginTop:8,padding:"14px",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,animation:"slideIn 0.15s ease"}}>
+              <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>SELECT TARGET DATE</div>
+              <input
+                type="date"
+                value={schedDate}
+                min={tomorrowStr()}
+                onChange={e=>setSchedDate(e.target.value)}
+                style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:T.text,fontFamily:MONO,fontSize:13,marginBottom:10,colorScheme:"dark"}}
+              />
+              <div style={{fontFamily:MONO,fontSize:9,color:T.textFaint,lineHeight:1.7,marginBottom:12}}>
+                The task will be removed from today and will appear on <span style={{color:color}}>{formatDateShort(schedDate)}</span> in the calendar — with its original time and color.
+              </div>
+              <button onClick={doSchedule} style={{width:"100%",background:color,border:"none",borderRadius:10,padding:"13px",color:"#000",fontFamily:MONO,fontSize:12,fontWeight:"bold",letterSpacing:1,cursor:"pointer",transition:"opacity 0.2s"}} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                → MOVE TO {formatDateShort(schedDate).toUpperCase()}
+              </button>
+            </div>
+          )}
+        </div>
+
         <button onClick={save} style={{width:"100%",background:"#FF6B2B",border:"none",borderRadius:12,padding:"15px",color:"#000",fontFamily:MONO,fontSize:14,fontWeight:"bold",letterSpacing:1,minHeight:52}}>SAVE CHANGES</button>
         <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
       </div>
@@ -960,7 +1036,7 @@ function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate
               value={newName}
               onChange={e=>setNewName(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&addTask()}
-              placeholder="Feladat hozzáadása…"
+              placeholder="Add a task…"
               style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:12,outline:"none"}}
               onFocus={e=>e.target.style.borderColor="#FF6B2B"}
               onBlur={e=>e.target.style.borderColor=T.border}
@@ -972,12 +1048,12 @@ function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate
           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:dayData.note!==undefined?10:0}}>
             {todayTasks.length > 0 && (
               <button onClick={copyFromToday} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"5px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>
-                ⎘ másolás a mai napból
+                ⎘ copy from today
               </button>
             )}
             {dayData.tasks.length > 0 && (
               <button onClick={()=>onUpdate({tasks:[]})} style={{background:"none",border:`1px solid #cc333344`,borderRadius:7,padding:"5px 10px",color:"#cc5555",fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#ff5555";e.currentTarget.style.color="#ff5555";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#cc333344";e.currentTarget.style.color="#cc5555";}}>
-                ✕ törlés mind
+                ✕ clear all
               </button>
             )}
           </div>
@@ -986,7 +1062,7 @@ function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate
           <textarea
             value={dayData.note || ""}
             onChange={e => updateNote(e.target.value)}
-            placeholder="Megjegyzés a naphoz…"
+            placeholder="Note for the day…"
             rows={2}
             style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:11,resize:"none",outline:"none",lineHeight:1.5,marginTop:8}}
             onFocus={e=>e.target.style.borderColor="#4ECDC4"}
@@ -998,8 +1074,79 @@ function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate
   );
 }
 
-function WeekView({ T, dark, step, todayTasks }) {
+
+// ── Calendar: Month grid ──────────────────────────────────────────────────────
+
+function MonthView({ T, onDateSelect, activeDate }) {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const today = todayStr();
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y-1); setViewMonth(11); } else setViewMonth(m => m-1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y+1); setViewMonth(0); } else setViewMonth(m => m+1); };
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const getDs = day => `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  // Read dots directly from per-date storage (computed once per render)
+  const datesWithTasks = getDatesWithTasks();
+
+  return (
+    <div style={{ padding: "12px 16px", paddingBottom: 100 }}>
+      {/* Month nav */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <button onClick={prevMonth} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, width: 36, height: 36, color: T.textMuted, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+        <span style={{ fontFamily: BEBAS, fontSize: 22, letterSpacing: 2, color: T.text }}>{monthNames[viewMonth]} {viewYear}</span>
+        <button onClick={nextMonth} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, width: 36, height: 36, color: T.textMuted, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+      </div>
+
+      {/* Day headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 3 }}>
+        {["M","T","W","Th","F","Sa","Su"].map((h,i) => (
+          <div key={i} style={{ textAlign: "center", fontFamily: MONO, fontSize: 9, color: T.textFaint, letterSpacing: 0.5, padding: "3px 0" }}>{h}</div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
+        {cells.map((day, idx) => {
+          if (!day) return <div key={`e-${idx}`} style={{ minHeight: 52 }} />;
+          const ds = getDs(day);
+          const dayTasks = datesWithTasks[ds] || [];
+          const isToday = ds === today;
+          const isActive = ds === activeDate;
+          const hasTasks = dayTasks.length > 0;
+          const isPast = ds < today;
+          return (
+            <button key={ds} onClick={() => onDateSelect(ds)}
+              style={{ background: isActive ? "#FF6B2B33" : isToday ? "#FF6B2B18" : hasTasks ? T.bgCard : "none", border: `1px solid ${isActive ? "#FF6B2B" : isToday ? "#FF6B2B66" : hasTasks ? T.border : "transparent"}`, borderRadius: 10, padding: "7px 2px 5px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minHeight: 52, transition: "all 0.15s", opacity: isPast && !hasTasks && !isToday ? 0.45 : 1 }}
+              onMouseEnter={e => { e.currentTarget.style.background = isActive?"#FF6B2B33":T.bgCard; e.currentTarget.style.borderColor = isActive?"#FF6B2B":T.borderMid; }}
+              onMouseLeave={e => { e.currentTarget.style.background = isActive?"#FF6B2B33":isToday?"#FF6B2B18":hasTasks?T.bgCard:"none"; e.currentTarget.style.borderColor = isActive?"#FF6B2B":isToday?"#FF6B2B66":hasTasks?T.border:"transparent"; }}>
+              <span style={{ fontFamily: MONO, fontSize: 12, color: isActive||isToday ? "#FF6B2B" : hasTasks ? T.text : T.textFaint, fontWeight: isActive||isToday ? "bold" : "normal" }}>{day}</span>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", minHeight: 8 }}>
+                {dayTasks.slice(0, 3).map((t, i) => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: t.color }} />)}
+                {dayTasks.length > 3 && <span style={{ fontSize: 7, color: T.textFaint, fontFamily: MONO, lineHeight: "6px" }}>+{dayTasks.length-3}</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{marginTop:14,fontFamily:MONO,fontSize:9,color:T.textFaint,textAlign:"center",letterSpacing:1}}>TAP A DAY TO VIEW &amp; EDIT ITS TASKS</div>
+    </div>
+  );
+}
+
+function WeekView({ T, dark, step, todayTasks, onDateSelect, activeDate }) {
   const [week, setWeek] = React.useState(initWeek);
+  const [weekView, setWeekView] = React.useState("week"); // "week" | "month"
 
   React.useEffect(() => { saveWeek(week); }, [week]);
 
@@ -1015,12 +1162,25 @@ function WeekView({ T, dark, step, todayTasks }) {
   const filledDays = week.filter(d => d.tasks.length > 0).length;
 
   return (
+    <div>
+      {/* Hét / Hónap toggle */}
+      <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,padding:"0 16px"}}>
+        {[["week","▦ WEEK"],["month","📅 MONTH"]].map(([v,label])=>(
+          <button key={v} onClick={()=>setWeekView(v)} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${weekView===v?"#4ECDC4":"transparent"}`,padding:"8px 0 6px",color:weekView===v?"#4ECDC4":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s",marginBottom:-1}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {weekView === "month" ? (
+        <MonthView T={T} onDateSelect={onDateSelect} activeDate={activeDate} />
+      ) : (
     <div style={{padding:"0 16px", paddingBottom:100}}>
       {/* Week summary bar */}
-      <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12,marginTop:12}}>
         <div>
           <div style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:"#FF6B2B",lineHeight:1}}>{formatHours(weekTotal)}</div>
-          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>HETI ÖSSZESEN</div>
+          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>WEEK TOTAL</div>
         </div>
         <div style={{flex:1, height:8, borderRadius:4, background:T.bgSlider, overflow:"hidden", display:"flex"}}>
           {week.map((d,i) => {
@@ -1031,7 +1191,7 @@ function WeekView({ T, dark, step, todayTasks }) {
         </div>
         <div style={{textAlign:"right",flexShrink:0}}>
           <div style={{fontFamily:MONO,fontSize:13,color:T.textSub,fontWeight:"bold"}}>{filledDays}<span style={{fontSize:9,color:T.textFaint,fontWeight:"normal"}}>/7</span></div>
-          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>NAP TELI</div>
+          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>DAYS FILLED</div>
         </div>
       </div>
 
@@ -1052,6 +1212,8 @@ function WeekView({ T, dark, step, todayTasks }) {
         ))}
       </div>
     </div>
+      )}
+    </div>
   );
 }
 
@@ -1064,8 +1226,10 @@ function App() {
   const [showSettings,setShowSettings]=useState(false), [showFavs,setShowFavs]=useState(false);
   const [showSync,setShowSync]=useState(false);
   const [activeView,setActiveView]=useState("today");
+  const [activeDate,setActiveDate]=useState(todayStr);
   const [dragOver,setDragOver]=useState(null), [longDragIdx,setLongDragIdx]=useState(null), [dragPos,setDragPos]=useState({x:0,y:0});
   const [inputFocused,setInputFocused]=useState(false);
+  const activeDateRef=useRef(activeDate);
   const lpTimer=useRef(null), confirmRmTimer=useRef(null), taskListRef=useRef(), fileRef=useRef(), inputRef=useRef();
 
   const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
@@ -1073,7 +1237,42 @@ function App() {
   const total=tasks.reduce((s,t)=>s+t.hours,0), remaining=dl-total;
   const over=remaining<-TOL, perfect=Math.abs(remaining)<TOL;
 
-  useEffect(()=>{saveState(state);},[state]);
+  // Keep activeDateRef in sync for use in closures
+  useEffect(()=>{ activeDateRef.current = activeDate; }, [activeDate]);
+
+  // Save state keyed by active date whenever state changes
+  useEffect(()=>{
+    saveDateState(activeDateRef.current, state);
+    saveState(state); // keep legacy key in sync for today
+  },[state]);
+
+  const switchDate = (ds) => {
+    saveDateState(activeDateRef.current, state);
+    const loaded = loadDateState(ds);
+    const next = loaded
+      ? { ...loaded, favs:state.favs, step:state.step, dark:state.dark }
+      : blankDayState(state);
+    dispatch({ type:"FULL_REPLACE", data:next });
+    setActiveDate(ds);
+    setActiveView("today");
+    setNewName("");
+    setEditTask(null);
+  };
+
+  const goToToday = () => switchDate(todayStr());
+
+  const scheduleTask = (task, targetDate) => {
+    // Save task into target date's stored state
+    const targetLoaded = loadDateState(targetDate);
+    const targetS = targetLoaded ? {...targetLoaded} : blankDayState(state);
+    const newTask = { ...task, id: Date.now() };
+    targetS.tasks = [...(targetS.tasks||[]), newTask];
+    saveDateState(targetDate, targetS);
+    dispatch({ type: "DEL_TASK", id: task.id });
+    setEditTask(null);
+    showToast(`📅 → ${formatDateShort(targetDate)}`);
+  };
+
   useEffect(()=>{
     document.documentElement.style.setProperty("--bg-slider",T.bgSlider);
     document.body.style.background=T.bg;
@@ -1156,13 +1355,25 @@ function App() {
           <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${Math.min(100,(total/dl)*100)}%`,background:over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B",transition:"width 0.2s,background 0.2s",borderRadius:"0 2px 2px 0"}}/>
         </div>
         {/* Tab bar */}
-        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`}}>
-          {[["today","⬡ TODAY"],["week","▦ WEEK"]].map(([v,label])=>(
-            <button key={v} onClick={()=>setActiveView(v)} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView===v?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView===v?"#FF6B2B":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s"}}>
-              {label}
-            </button>
-          ))}
-        </div>
+        {(()=>{
+          const isToday = activeDate === todayStr();
+          const dayLabel = isToday ? "⬡ TODAY" : formatDateLabel(activeDate).toUpperCase();
+          return (
+            <div style={{display:"flex",borderBottom:`1px solid ${T.border}`}}>
+              {!isToday && (
+                <button onClick={goToToday} style={{background:"none",border:"none",borderBottom:"2px solid transparent",padding:"9px 12px 7px",color:T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",transition:"color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.color="#FF6B2B"} onMouseLeave={e=>e.currentTarget.style.color=T.textFaint}>
+                  ⬡ TODAY
+                </button>
+              )}
+              <button onClick={()=>setActiveView("today")} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView==="today"?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView==="today"?"#FF6B2B":isToday?T.textFaint:"#4ECDC4",fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {dayLabel}
+              </button>
+              <button onClick={()=>setActiveView("week")} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView==="week"?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView==="week"?"#FF6B2B":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s"}}>
+                ▦ WEEK
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{padding:"0 16px"}}>
@@ -1189,8 +1400,11 @@ function App() {
                       <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tStart)}</span>
                       <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tEnd)}</span>
                     </div>
-                    <div style={{height:4,borderRadius:3,background:T.bgSlider,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:`${pct}%`,borderRadius:3,background:c,boxShadow:t.done?"none":`0 0 6px ${c}66`,transition:"width 0.3s"}}/>
+                    <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                      <div style={{flex:1,height:4,borderRadius:3,background:T.bgSlider,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${pct}%`,borderRadius:3,background:c,boxShadow:t.done?"none":`0 0 6px ${c}66`,transition:"width 0.3s"}}/>
+                      </div>
+                      <span style={{fontFamily:MONO,fontSize:9,color:adjustColor(c,0,-20),flexShrink:0,minWidth:28,textAlign:"right"}}>{formatHours(t.hours)}</span>
                     </div>
                   </div>
                 );
@@ -1361,10 +1575,10 @@ function App() {
       </div>
 
       {activeView==="week" && (
-        <WeekView T={T} dark={dark} step={step} todayTasks={tasks}/>
+        <WeekView T={T} dark={dark} step={step} todayTasks={tasks} onDateSelect={switchDate} activeDate={activeDate}/>
       )}
 
-      {editTask&&<EditModal task={editTask} T={T} onSave={p=>{dispatch({type:"UPD_TASK",id:editTask.id,patch:p});setEditTask(null);showToast("Task updated ✓");}} onClose={()=>setEditTask(null)}/>}
+      {editTask&&<EditModal task={editTask} T={T} onSave={p=>{dispatch({type:"UPD_TASK",id:editTask.id,patch:p});setEditTask(null);showToast("Task updated ✓");}} onSchedule={date=>scheduleTask(editTask,date)} onClose={()=>setEditTask(null)}/>}
       {showSync&&<SyncModal T={T} dark={dark} state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
       {toast&&<div style={{position:"fixed",bottom:"calc(20px + env(safe-area-inset-bottom,0px))",left:"50%",transform:"translateX(-50%)",zIndex:200,background:toast.type==="err"?"#ff444422":"#FF6B2B22",border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`,borderRadius:24,padding:"12px 22px",fontFamily:MONO,fontSize:12,color:toast.type==="err"?"#ff7777":"#FF6B2B",animation:"toastIn 0.2s ease",whiteSpace:"nowrap",backdropFilter:"blur(8px)"}}>{toast.msg}</div>}
     </div>
