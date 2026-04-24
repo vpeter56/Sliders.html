@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy — Sliders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --bg-card: #1a1a1a;
+      --border: #2a2a2a;
+      --orange: #FF6B2B;
+      --teal: #4ECDC4;
+      --text: #e8e8e8;
+      --muted: #888;
+      --faint: #444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 24px 0;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+    .header-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 4px;
+      color: var(--orange);
+      text-decoration: none;
+    }
+    .lang-toggle {
+      display: flex;
+      gap: 4px;
+    }
+    .lang-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .lang-btn.active {
+      border-color: var(--orange);
+      color: var(--orange);
+      background: #FF6B2B11;
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-eyebrow {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--orange);
+      margin-bottom: 12px;
+    }
+    .hero-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(42px, 8vw, 72px);
+      letter-spacing: 4px;
+      color: var(--text);
+      line-height: 0.95;
+      margin-bottom: 20px;
+    }
+    .hero-title span { color: var(--orange); }
+    .hero-meta {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+    .meta-item strong { color: var(--teal); font-weight: 400; }
+
+    /* ── Section ── */
+    section {
+      margin-bottom: 40px;
+    }
+    .section-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--orange);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--faint);
+    }
+    h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      letter-spacing: 2px;
+      color: var(--text);
+      margin-bottom: 14px;
+      font-weight: 400;
+    }
+    p {
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    p:last-child { margin-bottom: 0; }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Data table ── */
+    .data-table {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .data-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      gap: 16px;
+      align-items: start;
+    }
+    .data-row:last-child { border-bottom: none; }
+    .data-key {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--orange);
+      padding-top: 1px;
+    }
+    .data-val {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ── Rights list ── */
+    .rights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .right-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .right-icon {
+      color: var(--teal);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .right-text { font-size: 12px; color: var(--muted); }
+    .right-text strong { color: var(--text); font-weight: 500; display: block; margin-bottom: 2px; font-size: 11px; letter-spacing: 0.5px; }
+
+    /* ── Contact card ── */
+    .contact-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .contact-line {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+    }
+    .contact-line span:first-child {
+      color: var(--faint);
+      font-size: 10px;
+      letter-spacing: 1px;
+      min-width: 80px;
+    }
+
+    /* ── Notice bar ── */
+    .notice {
+      background: #FF6B2B0d;
+      border: 1px solid #FF6B2B33;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 16px 0;
+    }
+    .notice strong { color: var(--orange); }
+
+    /* ── Divider ── */
+    .lang-divider {
+      border: none;
+      border-top: 2px solid var(--faint);
+      margin: 64px 0;
+      position: relative;
+    }
+    .lang-divider::after {
+      content: 'MAGYAR / HUNGARIAN';
+      position: absolute;
+      top: -9px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg);
+      padding: 0 16px;
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--teal);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--faint);
+      letter-spacing: 1px;
+    }
+
+    /* ── Lang sections ── */
+    .lang-section { display: block; }
+    .lang-section.hidden { display: none; }
+
+    @media (max-width: 600px) {
+      .data-row { grid-template-columns: 1fr; gap: 4px; }
+      .hero-meta { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="/" class="logo">SLIDERS</a>
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en')" id="btn-en">EN</button>
+      <button class="lang-btn" onclick="setLang('hu')" id="btn-hu">HU</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- ENGLISH -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <div class="lang-section" id="lang-en">
+
+    <div class="hero">
+      <div class="hero-eyebrow">LEGAL DOCUMENT</div>
+      <div class="hero-title">PRIVACY<br><span>POLICY</span></div>
+      <div class="hero-meta">
+        <div class="meta-item">APP <strong>SLIDERS</strong></div>
+        <div class="meta-item">EFFECTIVE <strong>2025-06-01</strong></div>
+        <div class="meta-item">CONTROLLER <strong>VINCZE PÉTER</strong></div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-label">01 — OVERVIEW</div>
+      <h2>WHO WE ARE</h2>
+      <p>Sliders is a personal day-planning application developed and operated by Vincze Péter ("we", "us", "controller"). This Privacy Policy explains what data we collect, why, and your rights regarding that data.</p>
+      <p>We are committed to processing your data lawfully, transparently, and only to the extent necessary to provide the service.</p>
+    </section>
+
+    <section>
+      <div class="section-label">02 — DATA COLLECTED</div>
+      <h2>WHAT WE COLLECT</h2>
+      <p>Sliders collects only the minimum data required to provide its features:</p>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">EMAIL ADDRESS</div>
+          <div class="data-val">Provided via Google Sign-In. Used solely to identify your account. We do not use it for marketing.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">TASK DATA</div>
+          <div class="data-val">Task names, time allocations, colors, and dates you enter in the app. Stored to enable cross-device sync.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">NOT COLLECTED</div>
+          <div class="data-val">We do not collect IP addresses, device identifiers, behavioural tracking data, location, or any other personal data beyond the above.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">03 — LEGAL BASIS</div>
+      <h2>WHY WE PROCESS IT</h2>
+      <p>Under GDPR Article 6, our legal bases are:</p>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">CONTRACT</div>
+          <div class="data-val">Processing your email and task data is necessary to provide the core functionality of the service you signed up for (Art. 6(1)(b)).</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">CONSENT</div>
+          <div class="data-val">By creating an account via Google Sign-In, you consent to the processing described in this policy (Art. 6(1)(a)).</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">04 — DATA STORAGE</div>
+      <h2>WHERE DATA IS STORED</h2>
+      <p>Your data is stored in <strong style="color:#e8e8e8">Supabase</strong>, a third-party infrastructure provider. Supabase operates on AWS infrastructure. We configure our Supabase project to use <strong style="color:#e8e8e8">EU-based servers</strong> (Frankfurt, eu-central-1) to ensure GDPR compliance.</p>
+      <p>Supabase implements Row Level Security (RLS), meaning each user can only access their own data — not other users' data, even at the database query level.</p>
+      <p>Supabase's own Privacy Policy is available at <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a>.</p>
+      <div class="notice">
+        <strong>NOTE ON PAID FEATURES:</strong> In the future, Sliders may offer optional paid features. Any payment processing will be handled by a third-party payment provider (e.g. Stripe) and subject to their own privacy policies. This policy will be updated accordingly before any such features are launched.
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">05 — RETENTION</div>
+      <h2>HOW LONG WE KEEP DATA</h2>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">ACTIVE ACCOUNT</div>
+          <div class="data-val">Data is retained as long as you have an active account.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">ACCOUNT DELETION</div>
+          <div class="data-val">Upon request or when you delete your account in-app, all your data is permanently deleted within 30 days.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">INACTIVE ACCOUNTS</div>
+          <div class="data-val">Accounts with no login activity for 24 months may be deleted after prior email notice.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">06 — YOUR RIGHTS</div>
+      <h2>GDPR RIGHTS</h2>
+      <p>As a data subject under GDPR, you have the following rights:</p>
+      <div class="rights-list">
+        <div class="right-item">
+          <div class="right-icon">◎</div>
+          <div class="right-text"><strong>RIGHT OF ACCESS</strong>You can request a copy of all personal data we hold about you.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">✎</div>
+          <div class="right-text"><strong>RIGHT TO RECTIFICATION</strong>You can correct inaccurate data at any time within the app.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">✕</div>
+          <div class="right-text"><strong>RIGHT TO ERASURE</strong>You can delete your account and all associated data directly in the app, or by contacting us.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">⊘</div>
+          <div class="right-text"><strong>RIGHT TO RESTRICT PROCESSING</strong>You can request that we limit processing of your data in certain circumstances.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">↗</div>
+          <div class="right-text"><strong>RIGHT TO DATA PORTABILITY</strong>You can request an export of your data in a machine-readable format (JSON).</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">⊙</div>
+          <div class="right-text"><strong>RIGHT TO WITHDRAW CONSENT</strong>You can withdraw consent at any time by deleting your account. Withdrawal does not affect prior lawful processing.</div>
+        </div>
+      </div>
+      <p>To exercise any right, contact us at <a href="mailto:sliders.dev.support@gmail.com">sliders.dev.support@gmail.com</a>. We will respond within 30 days.</p>
+      <p>You also have the right to lodge a complaint with your national data protection authority. In Hungary: <a href="https://naih.hu" target="_blank">NAIH (naih.hu)</a>.</p>
+    </section>
+
+    <section>
+      <div class="section-label">07 — COOKIES</div>
+      <h2>COOKIES &amp; LOCAL STORAGE</h2>
+      <p>Sliders uses browser <strong style="color:#e8e8e8">localStorage</strong> to cache your task data locally for offline use. This is not a tracking cookie — it contains only your task data and app preferences, stored only on your own device.</p>
+      <p>Authentication state is maintained via a Supabase session token stored in localStorage. This is strictly necessary for the login feature to function and does not track behaviour.</p>
+      <p>We use no third-party analytics, advertising, or tracking cookies of any kind.</p>
+    </section>
+
+    <section>
+      <div class="section-label">08 — CONTACT</div>
+      <h2>DATA CONTROLLER</h2>
+      <div class="contact-card">
+        <div class="contact-line"><span>CONTROLLER</span> Vincze Péter</div>
+        <div class="contact-line"><span>EMAIL</span> <a href="mailto:sliders.dev.support@gmail.com">sliders.dev.support@gmail.com</a></div>
+        <div class="contact-line"><span>RESPONSE TIME</span> Within 30 calendar days</div>
+        <div class="contact-line"><span>AUTHORITY</span> <a href="https://naih.hu" target="_blank">NAIH — naih.hu</a></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">09 — CHANGES</div>
+      <h2>POLICY UPDATES</h2>
+      <p>We may update this policy as the service evolves. Material changes will be communicated via the app or by email. The effective date at the top of this page will always reflect the latest version.</p>
+      <p>Continued use of Sliders after a policy update constitutes acceptance of the revised policy.</p>
+    </section>
+
+  </div><!-- /lang-en -->
+
+  <hr class="lang-divider"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- HUNGARIAN -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <div class="lang-section hidden" id="lang-hu">
+
+    <div class="hero">
+      <div class="hero-eyebrow">JOGI DOKUMENTUM</div>
+      <div class="hero-title">ADATVÉDELMI<br><span>TÁJÉKOZTATÓ</span></div>
+      <div class="hero-meta">
+        <div class="meta-item">ALKALMAZÁS <strong>SLIDERS</strong></div>
+        <div class="meta-item">HATÁLYOS <strong>2025-06-01</strong></div>
+        <div class="meta-item">ADATKEZELŐ <strong>VINCZE PÉTER</strong></div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-label">01 — BEVEZETŐ</div>
+      <h2>KIK VAGYUNK</h2>
+      <p>A Sliders egy személyes naptervező alkalmazás, amelyet Vincze Péter („mi", „adatkezelő") fejleszt és üzemeltet. Ez az adatvédelmi tájékoztató bemutatja, hogy milyen adatokat gyűjtünk, miért, és milyen jogok illetik meg Önt ezekkel kapcsolatban.</p>
+      <p>Elkötelezettek vagyunk amellett, hogy adatait jogszerűen, átláthatóan és csak a szolgáltatás nyújtásához szükséges mértékben kezeljük.</p>
+    </section>
+
+    <section>
+      <div class="section-label">02 — GYŰJTÖTT ADATOK</div>
+      <h2>MIT GYŰJTÜNK</h2>
+      <p>A Sliders kizárólag a funkciók működéséhez minimálisan szükséges adatokat gyűjti:</p>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">E-MAIL CÍM</div>
+          <div class="data-val">A Google bejelentkezés során kerül megadásra. Kizárólag a fiók azonosítására szolgál. Marketingcélokra nem használjuk.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">FELADAT ADATOK</div>
+          <div class="data-val">Az alkalmazásban rögzített feladatnevek, időbeosztások, színek és dátumok. Az eszközök közötti szinkronizáció érdekében kerülnek tárolásra.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">NEM GYŰJTÜNK</div>
+          <div class="data-val">Nem gyűjtünk IP-címet, eszközazonosítókat, viselkedési adatokat, helyadatokat vagy más személyes adatokat a fentieken kívül.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">03 — JOGALAP</div>
+      <h2>AZ ADATKEZELÉS JOGALAPJA</h2>
+      <p>A GDPR 6. cikke alapján az adatkezelés jogalapjai:</p>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">SZERZŐDÉS</div>
+          <div class="data-val">Az e-mail cím és feladatadatok kezelése szükséges a regisztrált szolgáltatás alapfunkcióinak nyújtásához (6. cikk (1) b) pont).</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">HOZZÁJÁRULÁS</div>
+          <div class="data-val">A Google bejelentkezéssel történő fiók létrehozással Ön hozzájárul a jelen tájékoztatóban leírt adatkezeléshez (6. cikk (1) a) pont).</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">04 — ADATTÁROLÁS</div>
+      <h2>HOL TÁROLJUK AZ ADATOKAT</h2>
+      <p>Az adatok a <strong style="color:#e8e8e8">Supabase</strong> harmadik fél infrastruktúra-szolgáltatónál kerülnek tárolásra, AWS infrastruktúrán. A Supabase projektünket <strong style="color:#e8e8e8">EU-s szervereken</strong> (Frankfurt, eu-central-1) üzemeltetjük a GDPR-megfelelőség biztosítása érdekében.</p>
+      <p>A Supabase sorszintű biztonsági megoldást (Row Level Security) alkalmaz, ami azt jelenti, hogy minden felhasználó csak a saját adatait érheti el — más felhasználók adatai az adatbázis-lekérdezések szintjén is hozzáférhetetlenek.</p>
+      <p>A Supabase adatvédelmi tájékoztatója elérhető: <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a></p>
+      <div class="notice">
+        <strong>MEGJEGYZÉS A FIZETŐS FUNKCIÓKRÓL:</strong> A jövőben a Sliders opcionális fizetős funkciókat kínálhat. A fizetések feldolgozását egy harmadik fél fizetési szolgáltató (pl. Stripe) végzi majd, saját adatvédelmi szabályzatuk szerint. Ezt a tájékoztatót az ilyen funkciók bevezetése előtt frissítjük.
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">05 — MEGŐRZÉSI IDŐ</div>
+      <h2>MENNYI IDEIG TÁROLJUK</h2>
+      <div class="data-table">
+        <div class="data-row">
+          <div class="data-key">AKTÍV FIÓK</div>
+          <div class="data-val">Az adatokat a fiók aktív fennállásáig megőrizzük.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">FIÓKTÖRLÉS</div>
+          <div class="data-val">Kérésre vagy az alkalmazáson belüli fióktörlés esetén az összes adat 30 napon belül véglegesen törlésre kerül.</div>
+        </div>
+        <div class="data-row">
+          <div class="data-key">INAKTÍV FIÓKOK</div>
+          <div class="data-val">A 24 hónapja inaktív fiókokat előzetes e-mailes értesítés után törölhetjük.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">06 — AZ ÖN JOGAI</div>
+      <h2>GDPR JOGOK</h2>
+      <p>Az érintettként a GDPR alapján az alábbi jogok illetik meg:</p>
+      <div class="rights-list">
+        <div class="right-item">
+          <div class="right-icon">◎</div>
+          <div class="right-text"><strong>HOZZÁFÉRÉSI JOG</strong>Kérheti az általunk tárolt személyes adatainak másolatát.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">✎</div>
+          <div class="right-text"><strong>HELYESBÍTÉSI JOG</strong>A pontatlan adatokat bármikor kijavíthatja az alkalmazásban.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">✕</div>
+          <div class="right-text"><strong>TÖRLÉSI JOG (ELFELEDTETÉS JOGA)</strong>Fiókját és az összes kapcsolódó adatot közvetlenül az alkalmazásban vagy megkeresés útján törölheti.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">⊘</div>
+          <div class="right-text"><strong>AZ ADATKEZELÉS KORLÁTOZÁSÁHOZ VALÓ JOG</strong>Kérheti, hogy bizonyos esetekben korlátozzuk adatai kezelését.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">↗</div>
+          <div class="right-text"><strong>ADATHORDOZHATÓSÁGHOZ VALÓ JOG</strong>Kérheti adatainak géppel olvasható formátumban (JSON) való kiadását.</div>
+        </div>
+        <div class="right-item">
+          <div class="right-icon">⊙</div>
+          <div class="right-text"><strong>HOZZÁJÁRULÁS VISSZAVONÁSÁNAK JOGA</strong>Hozzájárulását bármikor visszavonhatja a fiók törlésével. A visszavonás nem érinti a korábbi jogszerű adatkezelést.</div>
+        </div>
+      </div>
+      <p>Jogai gyakorlásához kérjük, keressen minket: <a href="mailto:sliders.dev.support@gmail.com">sliders.dev.support@gmail.com</a>. 30 napon belül válaszolunk.</p>
+      <p>Panasszal fordulhat a Nemzeti Adatvédelmi és Információszabadság Hatósághoz (NAIH): <a href="https://naih.hu" target="_blank">naih.hu</a></p>
+    </section>
+
+    <section>
+      <div class="section-label">07 — SÜTIK</div>
+      <h2>SÜTIK ÉS HELYI TÁROLÁS</h2>
+      <p>A Sliders böngészői <strong style="color:#e8e8e8">localStorage</strong>-t használ a feladatadatok helyi gyorsítótárazásához, az offline működés érdekében. Ez nem nyomkövetési süti — kizárólag az Ön feladatadatait és alkalmazásbeállításait tartalmazza, és csak az Ön saját eszközén kerül tárolásra.</p>
+      <p>A hitelesítési állapotot egy Supabase munkamenet-token tartja fenn a localStorage-ban. Ez kizárólag a bejelentkezési funkció működéséhez szükséges, viselkedési adatokat nem rögzít.</p>
+      <p>Harmadik fél analitikai, reklám- vagy nyomkövetési sütiket nem alkalmazunk.</p>
+    </section>
+
+    <section>
+      <div class="section-label">08 — KAPCSOLAT</div>
+      <h2>ADATKEZELŐ</h2>
+      <div class="contact-card">
+        <div class="contact-line"><span>ADATKEZELŐ</span> Vincze Péter</div>
+        <div class="contact-line"><span>E-MAIL</span> <a href="mailto:sliders.dev.support@gmail.com">sliders.dev.support@gmail.com</a></div>
+        <div class="contact-line"><span>VÁLASZIDŐ</span> 30 naptári napon belül</div>
+        <div class="contact-line"><span>HATÓSÁG</span> <a href="https://naih.hu" target="_blank">NAIH — naih.hu</a></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">09 — MÓDOSÍTÁSOK</div>
+      <h2>TÁJÉKOZTATÓ FRISSÍTÉSE</h2>
+      <p>A tájékoztatót a szolgáltatás fejlődésével párhuzamosan frissíthetjük. Lényeges változásokról az alkalmazáson belül vagy e-mailben értesítjük. Az oldal tetején feltüntetett hatályba lépési dátum mindig a legfrissebb verziót jelzi.</p>
+      <p>A frissítés utáni folyamatos használat a módosított tájékoztató elfogadását jelenti.</p>
+    </section>
+
+  </div><!-- /lang-hu -->
+
+</main>
+
+<footer>
+  © 2025 VINCZE PÉTER — SLIDERS — <a href="mailto:sliders.dev.support@gmail.com">sliders.dev.support@gmail.com</a>
+</footer>
+
+<script>
+  function setLang(lang) {
+    document.getElementById('lang-en').classList.toggle('hidden', lang !== 'en');
+    document.getElementById('lang-hu').classList.toggle('hidden', lang !== 'hu');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.getElementById('btn-hu').classList.toggle('active', lang === 'hu');
+    // Show divider only when both visible (never for toggle UI)
+  }
+  // Auto-detect Hungarian browser
+  if (navigator.language?.startsWith('hu')) setLang('hu');
+</script>
+
+</body>
+</html>
