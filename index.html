@@ -1473,8 +1473,9 @@ function App() {
             </div>
           )}
         </div>
-
-
+        <div style={{textAlign:"center",padding:"2px 0 10px"}}>
+          <a href="./privacy.html" target="_blank" rel="noopener noreferrer" style={{fontFamily:MONO,fontSize:9,color:T.textFaint,letterSpacing:1,textDecoration:"none",borderBottom:"1px solid #333",paddingBottom:1}} onMouseEnter={e=>e.currentTarget.style.color="#4ECDC4"} onMouseLeave={e=>e.currentTarget.style.color=T.textFaint}>PRIVACY POLICY ↗</a>
+        </div>
 
         {/* FAVOURITES */}
         <div style={{marginBottom:12}}>
@@ -1587,6 +1588,29 @@ function App() {
 
 migrateOldData();
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<!-- ── Cookie consent banner (vanilla, outside React) ── -->
+<div id="cookie-banner" style="display:none;position:fixed;bottom:20px;right:16px;z-index:9999;max-width:300px;width:calc(100vw - 32px);background:#1a1a1a;border:1px solid #2a2a2a;border-radius:14px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.55);font-family:'Space Mono',monospace;animation:slideIn 0.25s ease;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;color:#FF6B2B;margin-bottom:6px;">🍪 COOKIE NOTICE</div>
+  <div style="font-size:10px;color:#888;line-height:1.7;margin-bottom:12px;">
+    Sliders uses <span style="color:#e8e8e8;">localStorage</span> for offline data and a session token for login. No tracking, no ads, no analytics.
+    <a href="./privacy.html" target="_blank" rel="noopener noreferrer" style="color:#4ECDC4;text-decoration:none;border-bottom:1px solid #4ECDC444;"> Privacy Policy ↗</a>
+  </div>
+  <button onclick="acceptCookies()" style="width:100%;background:#FF6B2B;border:none;border-radius:8px;padding:9px;color:#000;font-family:'Space Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:1px;cursor:pointer;">GOT IT</button>
+</div>
+<script>
+  (function() {
+    if (!localStorage.getItem('sliders_cookie_consent')) {
+      document.getElementById('cookie-banner').style.display = 'block';
+    }
+  })();
+  function acceptCookies() {
+    localStorage.setItem('sliders_cookie_consent', '1');
+    var el = document.getElementById('cookie-banner');
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.2s ease';
+    setTimeout(function() { el.remove(); }, 220);
+  }
 </script>
 </body>
 </html>
