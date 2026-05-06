@@ -5,63 +5,245 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="theme-color" content="#1c1c1e" id="themeColorMeta"/>
+<meta name="theme-color" content="#131420" id="themeColorMeta"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta http-equiv="Pragma" content="no-cache"/>
-<meta http-equiv="Expires" content="0"/>
 <title>Sliders</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <style>
+:root {
+  --bg: #131420;
+  --bg-elev: #1b1d2e;
+  --bg-elev-2: #242639;
+  --bg-input: #1f2134;
+  --bg-track: #2c2e44;
+  --border: #2a2c40;
+  --border-strong: #3a3d56;
+  --text: #f3eef0;
+  --text-2: #cfc8d1;
+  --text-3: #8d8898;
+  --text-4: #5d5969;
+  --accent: #ff7a5c;         /* coral */
+  --accent-2: #5dd6c5;       /* turquoise */
+  --accent-3: #ffd166;       /* sun yellow */
+  --danger: #ff5e5b;
+  --success: #5dd6c5;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 18px;
+  --gap: 12px;
+  --tap: 44px;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.45);
+}
+[data-theme="light"] {
+  --bg: #fdf6ee;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f4ebe0;
+  --bg-input: #f8f0e5;
+  --bg-track: #ebe0d2;
+  --border: #ecdfcd;
+  --border-strong: #d4c2a8;
+  --text: #1d1f2c;
+  --text-2: #3a3d4e;
+  --text-3: #6b6e80;
+  --text-4: #98a;
+  --accent: #ee5a3a;
+  --accent-2: #1aa794;
+  --accent-3: #d99019;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body { min-height: 100dvh; background: #1c1c1e; color: #f5f5f5; transition: background 0.25s; overscroll-behavior-y: none; }
-textarea, input { outline: none; -webkit-appearance: none; appearance: none; }
-button { -webkit-appearance: none; appearance: none; touch-action: manipulation; cursor: pointer; }
-input[type="text"], input[type="color"], textarea { font-size: 16px !important; }
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-thumb { border-radius: 2px; background: #444; }
-@keyframes slideIn { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:translateY(0) } }
-@keyframes toastIn { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
-@keyframes fadeUp  { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+html, body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+textarea, input { outline: none; -webkit-appearance: none; appearance: none; font-family: inherit; }
+button { -webkit-appearance: none; appearance: none; touch-action: manipulation; cursor: pointer; font-family: inherit; }
+input[type="text"], input[type="color"], textarea, input[type="date"] { font-size: 16px !important; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { border-radius: 3px; background: var(--border-strong); }
+::-webkit-scrollbar-track { background: transparent; }
+
 @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
-@keyframes floatIn { from { opacity:0; transform:rotate(-1.5deg) scale(0.9) } to { opacity:1; transform:rotate(-1.5deg) scale(1.04) } }
-@keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; display:flex; align-items:flex-end; justify-content:center; animation:fadeIn 0.15s ease; backdrop-filter:blur(4px); }
-.modal-sheet { width:100%; max-width:520px; animation:fadeUp 0.22s ease; }
-.sticky-header { position:sticky; top:0; left:0; width:100%; z-index:20; }
-@media (min-width:600px) { .main-wrap { max-width:600px !important; } .modal-overlay { align-items:center; } .modal-sheet { border-radius:16px !important; max-width:460px; } }
-@media (min-width:900px) { .main-wrap { max-width:720px !important; } }
+@keyframes fadeUp  { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
+@keyframes slideUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+@keyframes toastIn { from { opacity:0; transform:translate(-50%,8px) } to { opacity:1; transform:translate(-50%,0) } }
+@keyframes pulse   { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+.app { max-width: 560px; margin: 0 auto; min-height: 100dvh; padding-bottom: 120px; }
+@media (min-width: 720px) { .app { max-width: 640px; } }
+
+/* Desktop two-column layout */
+@media (min-width: 980px) {
+  .app { max-width: 1100px; padding-bottom: 60px; }
+  .desktop-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .desktop-grid > .col-left {
+    position: sticky;
+    top: 130px;
+    align-self: start;
+  }
+}
+
+/* Focus rings — keyboard accessibility */
+button:focus-visible, input:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn:focus-visible { outline-offset: 1px; }
+
+/* Hover affordances on desktop */
+@media (hover: hover) and (pointer: fine) {
+  .task-row:hover .row-nudge { opacity: 1; }
+  .row-nudge { opacity: 0; transition: opacity 0.15s; }
+}
+
+/* Help shortcut hint badges */
+.shortcut-hint {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+}
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8,9,15,0.65); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.18s ease;
+}
+.modal-sheet {
+  width: 100%; max-width: 520px;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: slideUp 0.22s cubic-bezier(.2,.8,.2,1);
+  max-height: 92dvh; overflow-y: auto;
+}
+@media (min-width: 600px) {
+  .modal-overlay { align-items: center; padding: 24px; }
+  .modal-sheet { border-radius: var(--radius-lg); max-width: 480px; }
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; min-height: var(--tap); padding: 0 18px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--bg-elev-2); color: var(--text);
+  font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+  transition: all 0.15s ease;
+}
+.btn:hover { border-color: var(--border-strong); background: var(--bg-input); }
+.btn-primary {
+  background: var(--accent); color: #0a0b12; border-color: transparent;
+  font-weight: 600;
+}
+.btn-primary:hover { background: color-mix(in oklab, var(--accent) 90%, white); }
+.btn-ghost { background: transparent; }
+.btn-ghost:hover { background: var(--bg-elev-2); }
+.btn-icon { width: var(--tap); padding: 0; }
+.btn-danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, var(--border)); }
+.btn-danger:hover { background: color-mix(in oklab, var(--danger) 10%, var(--bg-elev-2)); }
+
+.input {
+  width: 100%; min-height: var(--tap);
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0 16px;
+  color: var(--text); font-size: 15px; letter-spacing: -0.01em;
+  transition: border-color 0.15s ease;
+}
+.input:focus { border-color: var(--accent); }
+
+.card {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase;
+  font-weight: 500;
+}
+
+.kbd {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  color: var(--text-3); background: var(--bg-elev-2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* Tab indicator underline */
+.tab-bar { display: flex; gap: 2px; padding: 0 4px; }
+.tab {
+  flex: 1; min-height: var(--tap); padding: 0 12px;
+  background: transparent; border: none; color: var(--text-3);
+  font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+  position: relative; transition: color 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.tab:hover { color: var(--text-2); }
+.tab.active { color: var(--text); }
+.tab.active::after {
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px;
+  height: 2px; background: var(--accent); border-radius: 2px 2px 0 0;
+}
+
+.toast {
+  position: fixed; bottom: calc(24px + env(safe-area-inset-bottom,0px));
+  left: 50%; transform: translateX(-50%);
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 999px; padding: 10px 18px;
+  font-size: 13px; color: var(--text);
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.22s cubic-bezier(.2,.8,.2,1);
+  z-index: 200;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.toast .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-2); }
+.toast.err .dot { background: var(--danger); }
+
+/* Number tabular for time */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* Scroll snap for compact rows */
+.no-select { user-select: none; -webkit-user-select: none; }
+
 </style>
 </head>
-<body style="background:#1c1c1e">
+<body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useRef, useEffect, useCallback, useReducer } = React;
+<script type="text/babel" data-presets="env,react" src="tweaks.jsx"></script>
+<script type="text/babel" data-presets="env,react">
+const { useState, useRef, useEffect, useCallback, useReducer, useMemo } = React;
 
+/* ─────────── Storage & helpers ─────────── */
 const STORAGE_KEY = "sliders_data";
 const WEEK_KEY = "sliders_week_v1";
-const DAYS_HU = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const DAYS_SHORT = ["M","T","W","Th","F","Sa","Su"];
-
 const USAGE_KEY = "sliders_task_usage";
-function loadUsage() { try { const r = localStorage.getItem(USAGE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; } }
-function saveUsage(u) { try { localStorage.setItem(USAGE_KEY, JSON.stringify(u)); } catch {} }
-function recordUsage(name) {
-  const u = loadUsage();
-  const key = name.toLowerCase().trim();
-  u[key] = (u[key] || 0) + 1;
-  saveUsage(u);
-}
-function getTopUsed(n = 3) {
-  const u = loadUsage();
-  return Object.entries(u).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
-}
-function loadWeek() {
-  try { const r = localStorage.getItem(WEEK_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
-}
-function saveWeek(w) { try { localStorage.setItem(WEEK_KEY, JSON.stringify(w)); } catch {} }
+const TWEAK_KEY = "sliders_tweaks_v1";
+const DAY_KEY = ds => `sliders_day_${ds}`;
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+function loadJSON(k, def=null) { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch { return def; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
 function dateStr(d) { const dd = d instanceof Date ? d : new Date(d); return `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`; }
 function todayStr() { return dateStr(new Date()); }
@@ -79,18 +261,14 @@ function formatDateShort(str) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${months[d.getMonth()]} ${d.getDate()}`;
 }
-// Per-date storage
-const DAY_KEY = ds => `sliders_day_${ds}`;
+
 function loadDateState(ds) {
-  try {
-    const r = localStorage.getItem(DAY_KEY(ds));
-    if (r) return JSON.parse(r);
-    // Migration: today falls back to legacy key
-    if (ds === todayStr()) { const old = localStorage.getItem(STORAGE_KEY); if (old) return JSON.parse(old); }
-    return null;
-  } catch { return null; }
+  const r = loadJSON(DAY_KEY(ds));
+  if (r) return r;
+  if (ds === todayStr()) return loadJSON(STORAGE_KEY);
+  return null;
 }
-function saveDateState(ds, s) { try { localStorage.setItem(DAY_KEY(ds), JSON.stringify(s)); } catch {} }
+function saveDateState(ds, s) { saveJSON(DAY_KEY(ds), s); }
 function getDatesWithTasks() {
   const result = {};
   try {
@@ -106,29 +284,27 @@ function getDatesWithTasks() {
   return result;
 }
 
-function initWeek() {
-  const saved = loadWeek();
-  // 7 days, each with tasks array and optional note
-  return saved || Array.from({length:7}, (_,i) => ({ dayIdx:i, tasks:[], note:"" }));
+function loadUsage() { return loadJSON(USAGE_KEY, {}); }
+function recordUsage(name) { const u = loadUsage(); const k = name.toLowerCase().trim(); u[k] = (u[k]||0)+1; saveJSON(USAGE_KEY, u); }
+function getTopUsed(n=3) {
+  const u = loadUsage();
+  return Object.entries(u).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
 }
-function weekTotalHours(dayData) {
-  return dayData.tasks.reduce((s,t)=>s+(t.hours||0),0);
-}
-const PALETTE = ["#FF6B2B","#FFB347","#4ECDC4","#A8E6CF","#FF8B94","#C9B1FF","#85C1E9","#F8D56B","#B5EAD7","#FF9AA2","#F06292","#81C784","#64B5F6","#FFD54F","#A1887F","#90A4AE"];
-const STEPS = [{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30}];
-const DARK  = { bg:"#1c1c1e", bgCard:"#2a2a2e", bgInput:"#323236", bgSlider:"#484850", border:"#505058", borderMid:"#626268", text:"#ffffff", textSub:"#e8e8e8", textMuted:"#c0c0c0", textDim:"#a0a0a0", textFaint:"#888890", donutFree:"#3a3a3e", tc:"#1c1c1e" };
-const LIGHT = { bg:"#f4f3ef", bgCard:"#eceae4", bgInput:"#e4e2db", bgSlider:"#d8d6cf", border:"#cac8c1", borderMid:"#bbb9b2", text:"#1a1a1a", textSub:"#2e2e2e", textMuted:"#555", textDim:"#777", textFaint:"#999", donutFree:"#d8d6cf", tc:"#f4f3ef" };
-const DEFAULT_TASKS = [
-  { id:1, name:"Sleep",    hours:8, originalHours:8, color:PALETTE[0], locked:false, actual:0 },
-  { id:2, name:"Work",     hours:6, originalHours:6, color:PALETTE[1], locked:false, actual:0 },
-  { id:3, name:"Exercise", hours:1, originalHours:1, color:PALETTE[2], locked:false, actual:0 },
-];
-const LONG_PRESS_MS = 400, TOAST_MS = 2500, CONFIRM_MS = 3000;
-const LERP_SLIDER = 0.3, LERP_DONUT = 0.22, LERP_RING = 0.22;
-const TOL = 0.001, TOL_SLIDER = 0.0005, TOL_ANGLE = 0.0008;
-const MONO = "'Space Mono',monospace", BEBAS = "'Bebas Neue',sans-serif";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const PALETTE = [
+  "#ff7a5c", "#5dd6c5", "#ffd166", "#a78bfa", "#06b6d4",
+  "#f472b6", "#84cc16", "#fb923c", "#60a5fa", "#c084fc",
+  "#34d399", "#fbbf24", "#f87171",
+];
+const STEPS = [{l:"5m",m:5},{l:"10m",m:10},{l:"15m",m:15},{l:"30m",m:30}];
+const DEFAULT_TASKS = [
+  { id:1, name:"Sleep",    hours:8, originalHours:8, color:PALETTE[6], locked:false, actual:0 },
+  { id:2, name:"Deep work", hours:4, originalHours:4, color:PALETTE[0], locked:false, actual:0 },
+  { id:3, name:"Movement", hours:1, originalHours:1, color:PALETTE[1], locked:false, actual:0 },
+];
+const TOL = 0.001, TOL_SLIDER = 0.0005, TOL_ANGLE = 0.0008;
+const LERP = 0.3, LERP_DONUT = 0.22, LERP_RING = 0.22;
+const LONG_PRESS_MS = 380, TOAST_MS = 2200, CONFIRM_MS = 3000;
 
 function formatHours(h) {
   const m = Math.round(h * 60), hh = Math.floor(m / 60), mm = m % 60;
@@ -146,19 +322,7 @@ function taskTimeRange(tasks, idx, dayStart) {
 }
 const snapToStep = (h, s) => Math.round(h * 60 / s) * s / 60;
 const calcDayLen = (s, e) => e >= s ? e - s : (24 - s) + e;
-
-function loadState() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
-function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} }
-
-function migrateOldData() {
-  try {
-    if (localStorage.getItem(STORAGE_KEY)) return;
-    for (const k of ["sliders_v5","sliders_v4","sliders_v3","sliders_v2","sliders_v1"]) {
-      const d = localStorage.getItem(k);
-      if (d) { localStorage.setItem(STORAGE_KEY, d); break; }
-    }
-  } catch {}
-}
+const nameLc = n => n.toLowerCase();
 
 function scaleTasksToTotal(tasks, target) {
   if (!tasks.length) return tasks;
@@ -183,78 +347,43 @@ function parseMD(text) {
   }
   return { tasks, dayStart, dayEnd };
 }
-
 function serializeMD(tasks, s=0, e=24) {
   const dl = calcDayLen(s, e), total = tasks.reduce((a,t)=>a+t.hours,0);
   const tt = h => `${String(Math.floor(h)).padStart(2,"0")}:${h%1?"30":"00"}`;
-  let out = `# Sliders — Daily Time Allocation\n\n> Day: ${tt(s)} → ${tt(e)} (${formatHours(dl)})\n> Total: ${formatHours(total)} / ${formatHours(dl)} | Unallocated: ${formatHours(Math.max(0,dl-total))}\n\n---\n\n`;
-  for (const t of tasks) out += `## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${formatHours(t.hours)} (${dl>0?((t.hours/dl)*100).toFixed(1):"—"}%)\n- Actual: ${formatHours(t.actual||0)}\n\n`;
-  return out + `---\n_Generated by Sliders App_\n`;
+  let out = `# Sliders — Daily Time Allocation\n\n> Day: ${tt(s)} → ${tt(e)} (${formatHours(dl)})\n> Total: ${formatHours(total)} / ${formatHours(dl)}\n\n---\n\n`;
+  for (const t of tasks) out += `## ${t.name} [${t.hours.toFixed(4)}h] ${t.color}\n- Planned: ${formatHours(t.hours)}\n\n`;
+  return out + `---\n_Generated by Sliders_\n`;
 }
 
-// ── Sync string encode/decode ─────────────────────────────────────────────────
-
-function encodeSyncString(state) {
-  const payload = {
-    tasks: state.tasks,
-    favs: state.favs,
-    step: state.step,
-    dark: state.dark,
-    showTL: state.showTL,
-    dayStart: state.dayStart,
-    dayEnd: state.dayEnd,
-    v: 1,
-    ts: Date.now(),
-  };
-  try {
-    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-  } catch { return null; }
+function encodeSync(state) {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify({...state, v:1, ts:Date.now()})))); } catch { return null; }
+}
+function decodeSync(str) {
+  try { const d = JSON.parse(decodeURIComponent(escape(atob(str.trim())))); return d.tasks ? d : null; } catch { return null; }
 }
 
-function decodeSyncString(str) {
-  try {
-    const json = decodeURIComponent(escape(atob(str.trim())));
-    const d = JSON.parse(json);
-    if (!d.tasks || !Array.isArray(d.tasks)) return null;
-    return d;
-  } catch { return null; }
-}
+function loadWeek() { return loadJSON(WEEK_KEY) || Array.from({length:7}, (_,i) => ({ dayIdx:i, tasks:[], note:"" })); }
+function weekTotalHours(d) { return d.tasks.reduce((s,t)=>s+(t.hours||0),0); }
 
-function hexToHsl(hex) {
-  let r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
-  const max=Math.max(r,g,b), min=Math.min(r,g,b); let h,s,l=(max+min)/2;
-  if (max===min) { h=s=0; } else {
-    const d=max-min; s=l>.5?d/(2-max-min):d/(max+min);
-    h=max===r?((g-b)/d+(g<b?6:0))/6:max===g?((b-r)/d+2)/6:((r-g)/d+4)/6;
-  }
-  return [h*360,s*100,l*100];
-}
-function hslToHex(h,s,l) {
-  s/=100; l/=100;
-  const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
-  return "#"+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join("");
-}
-function adjustColor(hex, ld, sd=0) {
-  if (!hex?.startsWith("#") || hex.length<7) return hex;
-  try { const [h,s,l]=hexToHsl(hex); return hslToHex(h,Math.max(0,Math.min(100,s+sd)),Math.max(0,Math.min(100,l+ld))); }
-  catch { return hex; }
-}
-
-// ── State ─────────────────────────────────────────────────────────────────────
-
+/* ─────────── State ─────────── */
 function initState() {
-  const s = loadDateState(todayStr()) || loadState();
-  return { tasks:s?.tasks??DEFAULT_TASKS, favs:s?.favs??[], step:s?.step??10, dark:s?.dark??true, showTL:s?.showTL??false, dayStart:s?.dayStart??10.5, dayEnd:s?.dayEnd??16 };
+  const s = loadDateState(todayStr()) || loadJSON(STORAGE_KEY);
+  return {
+    tasks: s?.tasks ?? DEFAULT_TASKS,
+    favs: s?.favs ?? [],
+    step: s?.step ?? 15,
+    dark: s?.dark ?? true,
+    showTL: s?.showTL ?? true,
+    dayStart: s?.dayStart ?? 8,
+    dayEnd: s?.dayEnd ?? 22,
+  };
 }
 function blankDayState(base) {
   return { tasks:[], favs:base.favs, step:base.step, dark:base.dark, showTL:base.showTL, dayStart:base.dayStart, dayEnd:base.dayEnd };
 }
 
-const nameLc = n => n.toLowerCase();
-
 function reducer(state, action) {
   const dl = calcDayLen(state.dayStart, state.dayEnd);
-
   switch (action.type) {
     case "ADD_TASK": {
       const { name, color, hours } = action;
@@ -297,11 +426,6 @@ function reducer(state, action) {
       const restored = nl > dl ? state.tasks.map(t=>({...t,hours:t.originalHours??t.hours})) : state.tasks;
       return { ...state, dayStart:start, dayEnd:end, tasks:scaleTasksToTotal(restored,nl) };
     }
-    case "SET_DAY_START": {
-      const nl = calcDayLen(action.start, state.dayEnd);
-      if (nl < 0.5) return state;
-      return { ...state, dayStart:action.start, tasks:scaleTasksToTotal(state.tasks,nl) };
-    }
     case "REORDER_TASKS": {
       const tasks = [...state.tasks];
       tasks.splice(action.to, 0, tasks.splice(action.from, 1)[0]);
@@ -316,630 +440,739 @@ function reducer(state, action) {
     }
     case "MERGE_IMPORT": {
       const d = action.data;
-      const existingTaskNames = new Set(state.tasks.map(t=>nameLc(t.name)));
-      const newTasks = (d.tasks||[]).filter(t=>!existingTaskNames.has(nameLc(t.name)));
-      const existingFavNames = new Set(state.favs.map(f=>nameLc(f.name)));
-      const newFavs = (d.favs||[]).filter(f=>!existingFavNames.has(nameLc(f.name)));
-      return { ...state, tasks:[...state.tasks,...newTasks], favs:[...state.favs,...newFavs] };
+      const eN = new Set(state.tasks.map(t=>nameLc(t.name)));
+      const newT = (d.tasks||[]).filter(t=>!eN.has(nameLc(t.name)));
+      const eF = new Set(state.favs.map(f=>nameLc(f.name)));
+      const newF = (d.favs||[]).filter(f=>!eF.has(nameLc(f.name)));
+      return { ...state, tasks:[...state.tasks,...newT], favs:[...state.favs,...newF] };
     }
     default: return state;
   }
 }
 
-// ── Ring slider ───────────────────────────────────────────────────────────────
-
-const RING_SIZE=220, RING_CX=110, RING_CY=110, RING_RADIUS=88, RING_THUMB=9, RING_STROKE=10;
-const RING_START_COLOR="#4ECDC4", RING_END_COLOR="#FF6B2B";
-const FULL_CIRCLE_PATH = `M ${RING_CX} ${RING_CY-RING_RADIUS} A ${RING_RADIUS} ${RING_RADIUS} 0 1 1 ${RING_CX-0.001} ${RING_CY-RING_RADIUS}`;
+/* ─────────── Day Window Ring (start/end of day) ─────────── */
+const RING_SIZE = 240, RING_CX = 120, RING_CY = 120, RING_R = 100, RING_THUMB = 14;
 
 const hourToAngle = h => (h/24)*2*Math.PI - Math.PI/2;
-const angleToHour = a => (((a+Math.PI/2)/(2*Math.PI)*24)%24+24)%24;
-const angleToHourSnapped = a => Math.round(angleToHour(a)*2)/2;
+const angleToHourSnapped = a => Math.round((((a+Math.PI/2)/(2*Math.PI)*24)%24+24)%24*2)/2;
 function angleDelta(from, to) {
   let d = ((to-from)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
   if (d>Math.PI) d-=2*Math.PI; return d;
 }
-function ringArcPath(a1, a2) {
+function ringArcPath(a1, a2, r) {
   let span = ((a2-a1)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
   if (span<0.001) span=2*Math.PI;
-  const large=span>Math.PI?1:0, x1=RING_CX+RING_RADIUS*Math.cos(a1), y1=RING_CY+RING_RADIUS*Math.sin(a1), x2=RING_CX+RING_RADIUS*Math.cos(a2), y2=RING_CY+RING_RADIUS*Math.sin(a2);
-  return `M ${x1} ${y1} A ${RING_RADIUS} ${RING_RADIUS} 0 ${large} 1 ${x2} ${y2}`;
+  const large=span>Math.PI?1:0;
+  const x1=RING_CX+r*Math.cos(a1), y1=RING_CY+r*Math.sin(a1);
+  const x2=RING_CX+r*Math.cos(a2), y2=RING_CY+r*Math.sin(a2);
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
 }
 
-function RingTimeLabel({ hour, angleRad, color }) {
-  const R=RING_RADIUS+22, lx=RING_CX+R*Math.cos(angleRad), ly=RING_CY+R*Math.sin(angleRad);
-  return <text x={lx} y={ly+4} textAnchor={lx<RING_CX-10?"end":lx>RING_CX+10?"start":"middle"} fill={color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{String(Math.floor(hour)).padStart(2,"0")}:{hour%1?"30":"00"}</text>;
-}
+function DayWindow({ dayStart, dayEnd, onChange, nowHour }) {
+  const svgRef = useRef();
+  const dragging = useRef(null);
+  const dispS = useRef(null), dispE = useRef(null);
+  const tgtS = useRef(hourToAngle(dayStart)), tgtE = useRef(hourToAngle(dayEnd));
+  const raf = useRef(null);
+  const [, tick] = useReducer(x=>x+1, 0);
 
-function CircularDaySlider({ dayStart, dayEnd, T, onChange }) {
-  const svgRef=useRef(), dragging=useRef(null);
-  // FIX: initialize display angles directly from props, no animation on first render
-  const dispStartA=useRef(null), dispEndA=useRef(null);
-  const tgtStartA=useRef(hourToAngle(dayStart)), tgtEndA=useRef(hourToAngle(dayEnd));
-  const animRaf=useRef(null);
-  const [,tick]=useReducer(x=>x+1,0);
-
-  // init display angles immediately on first render
-  if (dispStartA.current === null) {
-    dispStartA.current = hourToAngle(dayStart);
-    dispEndA.current = hourToAngle(dayEnd);
+  if (dispS.current === null) {
+    dispS.current = hourToAngle(dayStart);
+    dispE.current = hourToAngle(dayEnd);
   }
-
-  function startAnim() {
-    if (animRaf.current) return;
+  const startAnim = () => {
+    if (raf.current) return;
     const run = () => {
-      const dS=angleDelta(dispStartA.current,tgtStartA.current), dE=angleDelta(dispEndA.current,tgtEndA.current);
-      dispStartA.current+=dS*LERP_RING; dispEndA.current+=dE*LERP_RING;
-      if (Math.abs(dS)<TOL_SLIDER && Math.abs(dE)<TOL_SLIDER) {
-        dispStartA.current=tgtStartA.current; dispEndA.current=tgtEndA.current;
-        animRaf.current=null; tick(); return;
+      const dS = angleDelta(dispS.current, tgtS.current);
+      const dE = angleDelta(dispE.current, tgtE.current);
+      dispS.current += dS * LERP_RING;
+      dispE.current += dE * LERP_RING;
+      if (Math.abs(dS) < TOL_SLIDER && Math.abs(dE) < TOL_SLIDER) {
+        dispS.current = tgtS.current; dispE.current = tgtE.current;
+        raf.current = null; tick(); return;
       }
-      tick(); animRaf.current=requestAnimationFrame(run);
+      tick(); raf.current = requestAnimationFrame(run);
     };
-    animRaf.current=requestAnimationFrame(run);
-  }
+    raf.current = requestAnimationFrame(run);
+  };
 
   useEffect(() => {
-    if (!dragging.current) { tgtStartA.current=hourToAngle(dayStart); tgtEndA.current=hourToAngle(dayEnd); startAnim(); }
+    if (!dragging.current) {
+      tgtS.current = hourToAngle(dayStart);
+      tgtE.current = hourToAngle(dayEnd);
+      startAnim();
+    }
   }, [dayStart, dayEnd]);
-  useEffect(() => () => { if (animRaf.current) cancelAnimationFrame(animRaf.current); }, []);
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
   const dl = calcDayLen(dayStart, dayEnd);
-  const tp = a => ({ x:RING_CX+RING_RADIUS*Math.cos(a), y:RING_CY+RING_RADIUS*Math.sin(a) });
-  const tS=tp(dispStartA.current), tE=tp(dispEndA.current);
+  const sP = { x: RING_CX + RING_R*Math.cos(dispS.current), y: RING_CY + RING_R*Math.sin(dispS.current) };
+  const eP = { x: RING_CX + RING_R*Math.cos(dispE.current), y: RING_CY + RING_R*Math.sin(dispE.current) };
 
   const getAngle = e => {
-    const rect=svgRef.current.getBoundingClientRect(), cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    const rect = svgRef.current.getBoundingClientRect();
+    const cx = e.clientX, cy = e.clientY;
     return Math.atan2((cy-rect.top)/rect.height*RING_SIZE-RING_CY, (cx-rect.left)/rect.width*RING_SIZE-RING_CX);
   };
-
-  const onDown = which => e => { e.preventDefault(); e.stopPropagation(); dragging.current=which; svgRef.current.setPointerCapture(e.pointerId); };
+  const onDown = which => e => { e.preventDefault(); e.stopPropagation(); dragging.current = which; svgRef.current.setPointerCapture(e.pointerId); };
   const onMove = e => {
     if (!dragging.current) return;
-    const rawA=getAngle(e), h=angleToHourSnapped(rawA);
-    if (dragging.current==="start") { tgtStartA.current=rawA; startAnim(); onChange(h,dayEnd); }
-    else { tgtEndA.current=rawA; startAnim(); onChange(dayStart,h); }
+    const rawA = getAngle(e), h = angleToHourSnapped(rawA);
+    if (dragging.current === "start") { tgtS.current = rawA; startAnim(); onChange(h, dayEnd); }
+    else { tgtE.current = rawA; startAnim(); onChange(dayStart, h); }
   };
-  const onUp = () => { dragging.current=null; tgtStartA.current=hourToAngle(dayStart); tgtEndA.current=hourToAngle(dayEnd); startAnim(); };
+  const onUp = () => { dragging.current = null; tgtS.current = hourToAngle(dayStart); tgtE.current = hourToAngle(dayEnd); startAnim(); };
 
-  const arcOp = 0.2+0.8*Math.max(0,Math.min(1,dl/24));
-  const timeRange = `${String(Math.floor(dayStart)).padStart(2,"0")}:${dayStart%1?"30":"00"}–${String(Math.floor(dayEnd)).padStart(2,"0")}:${dayEnd%1?"30":"00"}`;
-
-  const Handle = ({ pos, color, which }) => <>
-    <circle cx={pos.x} cy={pos.y} r={RING_THUMB+4} fill="transparent" style={{cursor:"grab"}} onPointerDown={onDown(which)}/>
-    <circle cx={pos.x} cy={pos.y} r={RING_THUMB} fill={color} stroke={T.bg} strokeWidth={2} style={{cursor:"grab",filter:`drop-shadow(0 0 4px ${color}88)`}} onPointerDown={onDown(which)}/>
-  </>;
+  // Hour ticks
+  const ticks = [];
+  for (let h = 0; h < 24; h += 3) {
+    const a = hourToAngle(h);
+    const r1 = RING_R - 6, r2 = RING_R + 6;
+    ticks.push({
+      x1: RING_CX + r1*Math.cos(a), y1: RING_CY + r1*Math.sin(a),
+      x2: RING_CX + r2*Math.cos(a), y2: RING_CY + r2*Math.sin(a),
+      h,
+    });
+  }
 
   return (
-    <div style={{position:"relative",width:RING_SIZE,height:RING_SIZE,flexShrink:0}}>
-      <svg ref={svgRef} width={RING_SIZE} height={RING_SIZE} style={{display:"block",touchAction:"none",userSelect:"none",overflow:"visible"}} onPointerMove={onMove} onPointerUp={onUp}>
-        <path d={FULL_CIRCLE_PATH} fill="none" stroke={T.bgSlider} strokeWidth={RING_STROKE} strokeLinecap="round"/>
-        <path d={ringArcPath(dispStartA.current,dispEndA.current)} fill="none" stroke={RING_END_COLOR} strokeWidth={RING_STROKE} strokeLinecap="round" opacity={arcOp} style={{transition:"opacity 0.3s"}}/>
-        <text x={RING_CX} y={RING_CY-8} textAnchor="middle" fill={T.text} fontSize={15} fontFamily={MONO} fontWeight="bold">{formatHours(dl)}</text>
-        <text x={RING_CX} y={RING_CY+8} textAnchor="middle" fill={T.textMuted} fontSize={11} fontFamily={MONO}>{timeRange}</text>
-        <Handle pos={tS} color={RING_START_COLOR} which="start"/>
-        <RingTimeLabel hour={dayStart} angleRad={dispStartA.current} color={RING_START_COLOR}/>
-        <Handle pos={tE} color={RING_END_COLOR} which="end"/>
-        <RingTimeLabel hour={dayEnd} angleRad={dispEndA.current} color={RING_END_COLOR}/>
-      </svg>
-    </div>
+    <svg
+      ref={svgRef} width={RING_SIZE} height={RING_SIZE}
+      style={{display:"block", touchAction:"none", overflow:"visible"}}
+      onPointerMove={onMove} onPointerUp={onUp}
+    >
+      {/* outer track */}
+      <circle cx={RING_CX} cy={RING_CY} r={RING_R} fill="none" stroke="var(--bg-track)" strokeWidth={2}/>
+      {/* hour ticks */}
+      {ticks.map((t,i)=>(
+        <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+          stroke="var(--text-4)" strokeWidth={1} opacity={t.h===0||t.h===12?0.7:0.35}/>
+      ))}
+      {/* hour labels */}
+      {[0,6,12,18].map(h=>{
+        const a = hourToAngle(h);
+        const r = RING_R + 22;
+        const x = RING_CX + r*Math.cos(a), y = RING_CY + r*Math.sin(a);
+        return (
+          <text key={h} x={x} y={y+4} textAnchor="middle"
+            fontFamily="var(--font-mono)" fontSize="10" fill="var(--text-4)" fontWeight="500">
+            {String(h).padStart(2,"0")}
+          </text>
+        );
+      })}
+      {/* "now" indicator — live current time tick */}
+      {typeof nowHour === "number" && (() => {
+        const a = hourToAngle(nowHour);
+        const r1 = RING_R - 12, r2 = RING_R + 12;
+        const x1 = RING_CX + r1*Math.cos(a), y1 = RING_CY + r1*Math.sin(a);
+        const x2 = RING_CX + r2*Math.cos(a), y2 = RING_CY + r2*Math.sin(a);
+        const dotR = RING_CX + (RING_R + 14)*Math.cos(a);
+        const dotY = RING_CY + (RING_R + 14)*Math.sin(a);
+        return (
+          <g pointerEvents="none">
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--accent-3)" strokeWidth={2} strokeLinecap="round"/>
+            <circle cx={dotR} cy={dotY} r={3.5} fill="var(--accent-3)">
+              <animate attributeName="opacity" values="1;0.45;1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+        );
+      })()}
+      {/* active arc */}
+      <path d={ringArcPath(dispS.current, dispE.current, RING_R)} fill="none"
+        stroke="url(#arcGrad)" strokeWidth={4} strokeLinecap="round" opacity={0.9}/>
+      <defs>
+        <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="var(--accent-2)"/>
+          <stop offset="100%" stopColor="var(--accent)"/>
+        </linearGradient>
+      </defs>
+
+      {/* Handles — generous hit areas */}
+      <circle cx={sP.x} cy={sP.y} r={26} fill="transparent" style={{cursor:"grab"}} onPointerDown={onDown("start")}/>
+      <circle cx={sP.x} cy={sP.y} r={RING_THUMB} fill="var(--bg-elev)" stroke="var(--accent-2)" strokeWidth={3} pointerEvents="none"/>
+      <circle cx={sP.x} cy={sP.y} r={4} fill="var(--accent-2)" pointerEvents="none"/>
+
+      <circle cx={eP.x} cy={eP.y} r={26} fill="transparent" style={{cursor:"grab"}} onPointerDown={onDown("end")}/>
+      <circle cx={eP.x} cy={eP.y} r={RING_THUMB} fill="var(--bg-elev)" stroke="var(--accent)" strokeWidth={3} pointerEvents="none"/>
+      <circle cx={eP.x} cy={eP.y} r={4} fill="var(--accent)" pointerEvents="none"/>
+    </svg>
   );
 }
 
-// ── Donut ─────────────────────────────────────────────────────────────────────
-
-const DONUT_SIZE=220, DONUT_R=72, DONUT_CX=110, DONUT_CY=110, DONUT_INNER=45;
+/* ─────────── Donut (allocation) ─────────── */
+const DONUT_R = 72, DONUT_CX = 120, DONUT_CY = 120, DONUT_INNER = 50;
 
 function buildSegPath(sa, sw) {
+  if (sw < 0.001) return "";
   const x1=DONUT_CX+DONUT_R*Math.cos(sa), y1=DONUT_CY+DONUT_R*Math.sin(sa);
   const x2=DONUT_CX+DONUT_R*Math.cos(sa+sw), y2=DONUT_CY+DONUT_R*Math.sin(sa+sw);
-  return `M ${DONUT_CX} ${DONUT_CY} L ${x1} ${y1} A ${DONUT_R} ${DONUT_R} 0 ${sw>Math.PI?1:0} 1 ${x2} ${y2} Z`;
-}
-
-// Build annular (donut ring) segment path for overlap visualization
-function buildRingPath(sa, sw, rInner, rOuter) {
-  if (sw < 0.001) return "";
+  const x3=DONUT_CX+DONUT_INNER*Math.cos(sa+sw), y3=DONUT_CY+DONUT_INNER*Math.sin(sa+sw);
+  const x4=DONUT_CX+DONUT_INNER*Math.cos(sa), y4=DONUT_CY+DONUT_INNER*Math.sin(sa);
   const large = sw > Math.PI ? 1 : 0;
-  const x1=DONUT_CX+rOuter*Math.cos(sa), y1=DONUT_CY+rOuter*Math.sin(sa);
-  const x2=DONUT_CX+rOuter*Math.cos(sa+sw), y2=DONUT_CY+rOuter*Math.sin(sa+sw);
-  const x3=DONUT_CX+rInner*Math.cos(sa+sw), y3=DONUT_CY+rInner*Math.sin(sa+sw);
-  const x4=DONUT_CX+rInner*Math.cos(sa), y4=DONUT_CY+rInner*Math.sin(sa);
-  return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${large} 0 ${x4} ${y4} Z`;
+  return `M ${x1} ${y1} A ${DONUT_R} ${DONUT_R} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${DONUT_INNER} ${DONUT_INNER} 0 ${large} 0 ${x4} ${y4} Z`;
 }
 
-// Calculate which angular ranges are "overflowed" (tasks beyond dayLen)
-function calcOverflowAngles(tasks, dayLen) {
-  if (dayLen <= 0) return [];
-  const total = tasks.reduce((s,t)=>s+(t.hours||0), 0);
-  if (total <= dayLen + TOL) return [];
+function Donut({ tasks, dayLen, dayStart, onSelectTask, selectedId }) {
+  const total = tasks.reduce((s,t)=>s+t.hours,0);
+  const isOver = total > dayLen + TOL;
+  const display = isOver ? tasks.map(t=>({...t, hours: t.hours * (dayLen/total)})) : tasks;
+  const remaining = Math.max(0, dayLen - display.reduce((s,t)=>s+t.hours,0));
+  const slices = [...display, ...(remaining>TOL?[{id:"free", hours:remaining, color:"var(--bg-track)", isFree:true}]:[])];
 
-  // The overflow starts at angle corresponding to dayLen, continues until total
-  const overflowStart = (dayLen / total) * 2 * Math.PI; // fraction of the full circle that's "valid"
-  // We need to find which segments are partially or fully in overflow
-  const overlapSegs = [];
-  let angle = 0;
-  for (const t of tasks) {
-    const sw = (t.hours / total) * 2 * Math.PI;
-    const segEnd = angle + sw;
-    if (segEnd > overflowStart) {
-      // this segment has some overflow
-      const overStart = Math.max(angle, overflowStart);
-      overlapSegs.push({
-        color: t.color,
-        startFrac: overStart / (2*Math.PI),
-        endFrac: segEnd / (2*Math.PI),
-      });
+  const animA = useRef({}), tgtA = useRef({}), raf = useRef(null);
+  const [, rerender] = useReducer(x=>x+1, 0);
+
+  useEffect(() => {
+    const targets = {};
+    let angle = -Math.PI/2;
+    for (const sl of slices) {
+      const sw = dayLen > 0 ? (sl.hours/dayLen)*2*Math.PI : 0;
+      targets[sl.id] = { startA: angle, sw: Math.max(0, sw) };
+      angle += sw;
     }
-    angle = segEnd;
-  }
-  return overlapSegs;
-}
+    tgtA.current = targets;
+    for (const id of Object.keys(targets)) {
+      if (!animA.current[id]) animA.current[id] = {...targets[id]};
+    }
+    if (raf.current) return;
+    const run = () => {
+      const tgt = tgtA.current, cur = animA.current; let more = false; const next = {};
+      for (const id of Object.keys(tgt)) {
+        const t = tgt[id], c = cur[id] || {...t};
+        if (Math.abs(t.startA-c.startA)<TOL_ANGLE && Math.abs(t.sw-c.sw)<TOL_ANGLE) next[id]={...t};
+        else { next[id]={startA:c.startA+(t.startA-c.startA)*LERP_DONUT, sw:c.sw+(t.sw-c.sw)*LERP_DONUT}; more=true; }
+      }
+      animA.current = next; rerender();
+      raf.current = more ? requestAnimationFrame(run) : null;
+    };
+    raf.current = requestAnimationFrame(run);
+  }, [tasks, dayLen]);
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
-function Donut({ tasks, T, dayLen, dayStart, onReorder }) {
-  const total=tasks.reduce((s,t)=>s+t.hours,0), unalloc=Math.max(0,dayLen-total);
-  // For display: clamp each task to dayLen proportionally when over
-  const displayTasks = total > dayLen + TOL
-    ? tasks.map(t=>({...t, hours: t.hours * (dayLen/total)}))
-    : tasks;
-  const displayUnalloc = Math.max(0, dayLen - displayTasks.reduce((s,t)=>s+t.hours,0));
-  const allSlices=[...displayTasks,...(displayUnalloc>TOL?[{id:"free",hours:displayUnalloc,color:T.donutFree}]:[])];
+  const segs = slices.map(sl => {
+    const a = animA.current[sl.id] || tgtA.current[sl.id];
+    if (!a || a.sw < 0.002) return null;
+    return { slice: sl, ...a };
+  });
 
-  const gb=Math.max(0.18,Math.min(1,dayLen/4));
-  const segBright=h=>dayLen<=0?.35:Math.max(0.35,Math.min(1,0.35+0.65*(h/dayLen)*allSlices.length));
-
-  const [dragSeg,setDragSeg]=useState(null), [overSeg,setOverSeg]=useState(null);
-  const [selectedId,setSelectedId]=useState(null);
-  const lpRef=useRef(), svgRef=useRef(), wrapRef=useRef();
-  const animA=useRef({}), tgtA=useRef({}), animRaf=useRef(null);
-  const [,rerender]=useReducer(x=>x+1,0);
-
-  // Compute selected task info
   const selectedTask = selectedId ? tasks.find(t=>t.id===selectedId) : null;
-  const selectedTimeRange = selectedTask ? (()=>{
+  const selRange = selectedTask ? (() => {
     const idx = tasks.findIndex(t=>t.id===selectedId);
-    let c = dayStart; for(let i=0;i<idx;i++) c+=tasks[i].hours||0;
+    let c = dayStart; for (let i=0;i<idx;i++) c+=tasks[i].hours||0;
     return { start: c, end: c + selectedTask.hours };
   })() : null;
 
-  // FIX: init animA immediately to avoid first-frame pop
-  const buildTargets = (slices, dl) => {
-    const targets={};
-    let angle=-Math.PI/2;
-    for (const sl of slices) {
-      const sw = dl > 0 ? (sl.hours/dl)*2*Math.PI : 0;
-      targets[sl.id]={startA:angle,sw:Math.max(0,sw)};
-      angle+=sw;
-    }
-    return targets;
-  };
+  // Auto-detect "sleep" task by name (matches "sleep", "alvás", etc.)
+  const isSleepName = n => /sleep|alv|rest|nap/i.test(n||"");
+  const sleepTask = tasks.find(t => isSleepName(t.name));
+  const sleepHours = sleepTask?.hours || 0;
+  const workHours = tasks.filter(t => t !== sleepTask).reduce((s,t)=>s+t.hours, 0);
 
-  useEffect(() => {
-    const targets = buildTargets(allSlices, dayLen);
-    tgtA.current=targets;
-    // init missing entries without animation
-    for (const id of Object.keys(targets)) {
-      if (!animA.current[id]) animA.current[id]={...targets[id]};
-    }
-    if (animRaf.current) return;
-    const run=()=>{
-      const tgt=tgtA.current, cur=animA.current; let more=false; const next={};
-      for (const id of Object.keys(tgt)) {
-        const t=tgt[id], c=cur[id]||{...t};
-        if (Math.abs(t.startA-c.startA)<TOL_ANGLE && Math.abs(t.sw-c.sw)<TOL_ANGLE) { next[id]={...t}; }
-        else { next[id]={startA:c.startA+(t.startA-c.startA)*LERP_DONUT, sw:c.sw+(t.sw-c.sw)*LERP_DONUT}; more=true; }
-      }
-      animA.current=next; rerender();
-      animRaf.current=more?requestAnimationFrame(run):null;
+  return (
+    <g style={{pointerEvents:"auto"}}>
+      {segs.map((seg, i) => {
+        if (!seg) return null;
+        const { slice } = seg;
+        const isFree = slice.isFree;
+        const isSel = !isFree && selectedId === slice.id;
+        return (
+          <path
+            key={slice.id || i}
+            d={buildSegPath(seg.startA, seg.sw)}
+            fill={isFree ? "var(--bg-track)" : slice.color}
+            stroke={isSel ? "var(--text)" : "var(--bg-elev)"}
+            strokeWidth={isSel ? 2 : 1}
+            opacity={isFree ? 0.6 : 1}
+            style={{
+              cursor: isFree ? "default" : "pointer",
+              transition: "stroke-width 0.15s, stroke 0.15s",
+              filter: isSel ? `drop-shadow(0 0 8px ${slice.color}aa)` : "none",
+            }}
+            onClick={isFree ? undefined : () => onSelectTask(slice.id === selectedId ? null : slice.id)}
+          />
+        );
+      })}
+      {/* center hole */}
+      <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_INNER-1} fill="var(--bg-elev)" pointerEvents="none"/>
+      {/* center label */}
+      {selectedTask ? (
+        <g pointerEvents="none">
+          <text x={DONUT_CX} y={DONUT_CY-4} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="22" fill={selectedTask.color} fontWeight="600" className="tnum" letterSpacing="-0.02em">
+            {formatHours(selectedTask.hours)}
+          </text>
+          <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="11" fill="var(--text-2)" letterSpacing="-0.005em">
+            {selectedTask.name.length>16?selectedTask.name.slice(0,16)+"…":selectedTask.name}
+          </text>
+        </g>
+      ) : sleepTask ? (
+        <g pointerEvents="none">
+          <text x={DONUT_CX} y={DONUT_CY-4} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="22" fill={sleepTask.color} fontWeight="600" className="tnum" letterSpacing="-0.02em">
+            {formatHours(sleepHours)} <tspan fontSize="13" fontWeight="500" fill={sleepTask.color} opacity="0.9">sleep</tspan>
+          </text>
+          <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="11" fill="var(--text-3)" letterSpacing="-0.005em">
+            {workHours > 0 ? `${formatHours(workHours)} work` : "no work yet"}
+          </text>
+        </g>
+      ) : (
+        <g pointerEvents="none">
+          <text x={DONUT_CX} y={DONUT_CY-4} textAnchor="middle" fontFamily="var(--font-sans)" fontSize="22" fill={isOver?"var(--danger)":"var(--text)"} fontWeight="600" className="tnum" letterSpacing="-0.02em">
+            {formatHours(total)}
+          </text>
+          <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="10" fill={isOver?"var(--danger)":"var(--text-3)"} letterSpacing="0.06em">
+            {isOver ? "OVER" : `of ${formatHours(dayLen)}`}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+/* ─────────── Linear Slider ─────────── */
+function Slider({ value, max, color, step, locked, onChange, ariaLabel }) {
+  const trackRef = useRef(), fillRef = useRef(), thumbRef = useRef();
+  const dragging = useRef(false), lastSnap = useRef(value);
+  const tgtRaw = useRef(value), curRaw = useRef(value), raf = useRef(null);
+
+  const applyPct = p => {
+    p = Math.max(0, Math.min(100, p));
+    if (fillRef.current) fillRef.current.style.width = p + "%";
+    if (thumbRef.current) thumbRef.current.style.left = p + "%";
+  };
+  const animTo = t => {
+    tgtRaw.current = t;
+    if (raf.current) return;
+    const run = () => {
+      const d = tgtRaw.current - curRaw.current;
+      if (Math.abs(d) < TOL_SLIDER) { curRaw.current = tgtRaw.current; applyPct(curRaw.current/max*100); raf.current = null; return; }
+      curRaw.current += d * LERP;
+      applyPct(curRaw.current/max*100);
+      raf.current = requestAnimationFrame(run);
     };
-    animRaf.current=requestAnimationFrame(run);
-  }, [tasks, dayLen]);
-  useEffect(()=>()=>{if(animRaf.current)cancelAnimationFrame(animRaf.current)},[]);
+    raf.current = requestAnimationFrame(run);
+  };
 
-  const segs=allSlices.map(sl=>{
-    const a=animA.current[sl.id]||tgtA.current[sl.id];
-    if (!a||a.sw<0.002) return null;
-    return {slice:sl,startA:a.startA,sw:a.sw,endA:a.startA+a.sw};
-  });
+  useEffect(() => { animTo(value); }, [value, max]);
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
-  const getSegIdx=e=>{
-    const rect=(wrapRef.current||svgRef.current).getBoundingClientRect();
-    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
-    const x=(cx-rect.left)/rect.width*DONUT_SIZE-DONUT_CX, y=(cy-rect.top)/rect.height*DONUT_SIZE-DONUT_CY;
-    const dist=Math.sqrt(x*x+y*y);
-    if (dist<DONUT_INNER||dist>DONUT_R+12) return null;
-    const ang=Math.atan2(y,x);
-    for (let i=0;i<segs.length;i++) {
-      const seg=segs[i]; if (!seg||seg.slice.id==="free") continue;
-      const nA=((ang-seg.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
-      const nSw=((seg.endA-seg.startA)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
-      if (nA<=nSw) return i;
+  const getRaw = cx => {
+    const r = trackRef.current.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (cx-r.left)/r.width)) * max;
+  };
+  const getSnap = cx => snapToStep(getRaw(cx), step);
+  const stepH = step/60;
+
+  const onDown = e => {
+    if (locked) return;
+    e.preventDefault();
+    dragging.current = true;
+    trackRef.current.setPointerCapture(e.pointerId);
+    trackRef.current.focus();
+    const r = getRaw(e.clientX);
+    curRaw.current = r; tgtRaw.current = r; applyPct(r/max*100);
+    const s = getSnap(e.clientX);
+    onChange(s); lastSnap.current = s;
+  };
+  const onMove = e => {
+    if (!dragging.current) return;
+    animTo(getRaw(e.clientX));
+    const s = getSnap(e.clientX);
+    if (s !== lastSnap.current) {
+      try { if (navigator.vibrate) navigator.vibrate(3); } catch {}
+      lastSnap.current = s;
     }
-    return null;
+    onChange(s);
+  };
+  const onUp = e => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const s = getSnap(e.clientX);
+    onChange(s); animTo(s);
+  };
+  const onWheel = e => {
+    if (locked) return;
+    e.preventDefault();
+    const dir = e.deltaY > 0 ? -1 : 1;
+    const big = e.shiftKey ? 4 : 1;
+    const next = Math.max(0, Math.min(max, value + dir * stepH * big));
+    onChange(Math.round(next*60/step)*step/60);
+  };
+  const onKey = e => {
+    if (locked) return;
+    let delta = 0;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = -stepH;
+    else if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = stepH;
+    else if (e.key === "PageDown") delta = -stepH * 4;
+    else if (e.key === "PageUp") delta = stepH * 4;
+    else if (e.key === "Home") { e.preventDefault(); onChange(0); return; }
+    else if (e.key === "End") { e.preventDefault(); onChange(max); return; }
+    else return;
+    e.preventDefault();
+    const next = Math.max(0, Math.min(max, value + delta));
+    onChange(Math.round(next*60/step)*step/60);
   };
 
-  const onDown=i=>e=>{ if(allSlices[i].id==="free")return; e.preventDefault(); wrapRef.current?.setPointerCapture(e.pointerId); lpRef.current=setTimeout(()=>{ try{if(navigator.vibrate)navigator.vibrate([10,30,10])}catch{} setDragSeg(i); },LONG_PRESS_MS); };
-  const onMove=e=>{ if(dragSeg===null)return; e.preventDefault(); const i=getSegIdx(e); setOverSeg(i!==null&&allSlices[i]?.id!=="free"&&i!==dragSeg?i:null); };
-  const onUp=(i)=>()=>{ clearTimeout(lpRef.current); if(dragSeg!==null&&overSeg!==null&&overSeg!==dragSeg)onReorder(dragSeg,overSeg); if(dragSeg===null&&i!==undefined&&allSlices[i]?.id!=="free"){ const tid=allSlices[i].id; setSelectedId(prev=>prev===tid?null:tid); } setDragSeg(null);setOverSeg(null); };
-  const onCancel=()=>{ clearTimeout(lpRef.current); setDragSeg(null);setOverSeg(null); };
-
-  // Compute overflow overlay: angle where tasks overflow dayLen
-  const isOver = total > dayLen + TOL;
-  const overflowAngle = isOver ? -Math.PI/2 + (dayLen/total)*2*Math.PI : null;
-
-  // unique pattern id
-  const patId = "overflow-hatch";
-
+  const ip = (value/max)*100;
   return (
-    <div ref={wrapRef} style={{position:"absolute",top:0,left:0,width:DONUT_SIZE,height:DONUT_SIZE,pointerEvents:dragSeg!==null?"auto":"none"}} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}>
-      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} style={{position:"absolute",top:0,left:0,pointerEvents:"none",touchAction:"none",cursor:dragSeg!==null?"grabbing":"default"}}>
-        <defs>
-          {/* Diagonal hatch pattern for overflow */}
-          <pattern id={patId} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,60,60,0.55)" strokeWidth="2.5"/>
-          </pattern>
-          <clipPath id="donut-clip">
-            <path d={`M ${DONUT_CX} ${DONUT_CY} m -${DONUT_R+2} 0 a ${DONUT_R+2} ${DONUT_R+2} 0 1 1 ${(DONUT_R+2)*2} 0 a ${DONUT_R+2} ${DONUT_R+2} 0 1 1 -${(DONUT_R+2)*2} 0 M ${DONUT_CX} ${DONUT_CY} m -${DONUT_INNER} 0 a ${DONUT_INNER} ${DONUT_INNER} 0 1 0 ${DONUT_INNER*2} 0 a ${DONUT_INNER} ${DONUT_INNER} 0 1 0 -${DONUT_INNER*2} 0`} fillRule="evenodd"/>
-          </clipPath>
-        </defs>
-
-        {segs.map((seg,i)=>{
-          if (!seg) return null;
-          const {slice}=seg, isFree=slice.id==="free", isDrag=dragSeg===i, isOverSeg=overSeg===i;
-          const isSelected=!isFree&&selectedId===slice.id;
-          const bright=isFree?gb:gb*segBright(slice.hours);
-          return (
-            <g key={slice.id||i} style={{transformOrigin:`${DONUT_CX}px ${DONUT_CY}px`,transform:`scale(${isDrag?1.08:isSelected?1.12:isOverSeg?.94:1})`,transition:dragSeg!==null?"transform 0.15s ease":"transform 0.25s ease",cursor:isFree?"default":dragSeg!==null?"grabbing":"pointer",opacity:isDrag?1:(slice.done?.4:1)*bright}} pointerEvents={isFree?"none":"auto"} onPointerDown={isFree?undefined:onDown(i)} onPointerUp={isFree?undefined:onUp(i)}>
-              <path d={buildSegPath(seg.startA,seg.sw)} fill={isOverSeg?"#888":(slice.done?"#444":slice.color)} stroke={isSelected?slice.color:(isDrag?slice.color:T.bg)} strokeWidth={isSelected?3:(isDrag?2.5:1.5)} style={{filter:isSelected?`drop-shadow(0 0 8px ${slice.color}cc) drop-shadow(0 0 3px ${slice.color})`:(isDrag?`drop-shadow(0 0 6px ${slice.color}88)`:"none"),transition:"fill 0.3s,opacity 0.3s,filter 0.15s,stroke-width 0.15s"}}/>
-            </g>
-          );
-        })}
-
-        {/* Overflow hatch overlay: covers the portion that exceeds dayLen */}
-        {isOver && overflowAngle !== null && (()=>{
-          // The overflow arc goes from overflowAngle back to -PI/2 (completing the circle)
-          const overStart = overflowAngle;
-          const overEnd = -Math.PI/2 + 2*Math.PI; // = 3PI/2
-          const sw = ((overEnd - overStart) + 2*Math.PI) % (2*Math.PI);
-          if (sw < 0.005) return null;
-          const large = sw > Math.PI ? 1 : 0;
-          const x1o=DONUT_CX+DONUT_R*Math.cos(overStart), y1o=DONUT_CY+DONUT_R*Math.sin(overStart);
-          const x2o=DONUT_CX+DONUT_R*Math.cos(overEnd),   y2o=DONUT_CY+DONUT_R*Math.sin(overEnd);
-          const x1i=DONUT_CX+DONUT_INNER*Math.cos(overEnd),   y1i=DONUT_CY+DONUT_INNER*Math.sin(overEnd);
-          const x2i=DONUT_CX+DONUT_INNER*Math.cos(overStart), y2i=DONUT_CY+DONUT_INNER*Math.sin(overStart);
-          const arcPath = `M ${x1o} ${y1o} A ${DONUT_R} ${DONUT_R} 0 ${large} 1 ${x2o} ${y2o} L ${x1i} ${y1i} A ${DONUT_INNER} ${DONUT_INNER} 0 ${large} 0 ${x2i} ${y2i} Z`;
-          return (
-            <g key="overflow-overlay" style={{pointerEvents:"none"}}>
-              <path d={arcPath} fill={`url(#${patId})`} opacity={0.9}/>
-              {/* Red boundary line at overflow start */}
-              <line
-                x1={DONUT_CX + DONUT_INNER*Math.cos(overflowAngle)}
-                y1={DONUT_CY + DONUT_INNER*Math.sin(overflowAngle)}
-                x2={DONUT_CX + DONUT_R*Math.cos(overflowAngle)}
-                y2={DONUT_CY + DONUT_R*Math.sin(overflowAngle)}
-                stroke="rgba(255,80,80,0.95)" strokeWidth={2} strokeDasharray="3,2"
-              />
-              {/* Small "OVER" label near the boundary */}
-              {(()=>{
-                const labelAngle = overflowAngle + sw/2;
-                const lr = (DONUT_INNER + DONUT_R) / 2;
-                return (
-                  <text
-                    x={DONUT_CX + lr*Math.cos(labelAngle)}
-                    y={DONUT_CY + lr*Math.sin(labelAngle)+3}
-                    textAnchor="middle" fill="rgba(255,100,100,0.95)"
-                    fontSize={7} fontFamily={MONO} fontWeight="bold"
-                    style={{pointerEvents:"none"}}
-                  >OVER</text>
-                );
-              })()}
-            </g>
-          );
-        })()}
-
-        <circle cx={DONUT_CX} cy={DONUT_CY} r={DONUT_INNER} fill={T.bg} style={{pointerEvents:"none"}}/>
-        {selectedTask && selectedTimeRange ? (<>
-          <text x={DONUT_CX} y={DONUT_CY-13} textAnchor="middle" fill={selectedTask.color} fontSize={8} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none",transition:"fill 0.2s"}}>{selectedTask.name.length>9?selectedTask.name.slice(0,9)+"…":selectedTask.name}</text>
-          <text x={DONUT_CX} y={DONUT_CY+1} textAnchor="middle" fill={selectedTask.color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatTime(selectedTimeRange.start)}</text>
-          <text x={DONUT_CX} y={DONUT_CY+14} textAnchor="middle" fill={selectedTask.color} fontSize={11} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatTime(selectedTimeRange.end)}</text>
-        </>) : (<>
-          <text x={DONUT_CX} y={DONUT_CY-7} textAnchor="middle" fill={isOver?"#ff6060":T.text} fontSize={12} fontFamily={MONO} fontWeight="bold" style={{pointerEvents:"none"}}>{formatHours(total)}</text>
-          <text x={DONUT_CX} y={DONUT_CY+9} textAnchor="middle" fill={dragSeg!==null?"#FF6B2B":isOver?"#ff6060":T.textMuted} fontSize={8} fontFamily={MONO} style={{pointerEvents:"none",transition:"fill 0.2s"}}>{dragSeg!==null?"swap ↕":isOver?"over":"allocated"}</text>
-        </>)}
-      </svg>
-    </div>
-  );
-}
-
-// ── Linear slider ─────────────────────────────────────────────────────────────
-
-function Slider({ value, max, color, step, locked, onChange }) {
-  const trackRef=useRef(), fillRef=useRef(), thumbRef=useRef();
-  const dragging=useRef(false), lastSnap=useRef(value), rafRef=useRef(null), tgtRaw=useRef(value), curRaw=useRef(value);
-
-  const applyPct=p=>{ p=Math.max(0,Math.min(100,p)); if(fillRef.current)fillRef.current.style.width=p+"%"; if(thumbRef.current)thumbRef.current.style.left=p+"%"; };
-  const animTo=t=>{ tgtRaw.current=t; if(rafRef.current)return;
-    const run=()=>{ const d=tgtRaw.current-curRaw.current; if(Math.abs(d)<TOL_SLIDER){curRaw.current=tgtRaw.current;applyPct(curRaw.current/max*100);rafRef.current=null;return;} curRaw.current+=d*LERP_SLIDER;applyPct(curRaw.current/max*100);rafRef.current=requestAnimationFrame(run); };
-    rafRef.current=requestAnimationFrame(run);
-  };
-
-  useEffect(()=>{animTo(value);},[value,max]);
-  useEffect(()=>()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current)},[]);
-
-  const getRaw=cx=>{ const r=trackRef.current.getBoundingClientRect(); return Math.max(0,Math.min(1,(cx-r.left)/r.width))*max; };
-  const getSnap=cx=>snapToStep(getRaw(cx),step);
-
-  const onDown=e=>{ if(locked)return; e.preventDefault(); dragging.current=true; trackRef.current.setPointerCapture(e.pointerId); const r=getRaw(e.clientX); curRaw.current=r;tgtRaw.current=r;applyPct(r/max*100); const s=getSnap(e.clientX); onChange(s);lastSnap.current=s; };
-  const onMove=e=>{ if(!dragging.current)return; animTo(getRaw(e.clientX)); const s=getSnap(e.clientX); if(s!==lastSnap.current){try{if(navigator.vibrate)navigator.vibrate(4)}catch{} lastSnap.current=s;} onChange(s); };
-  const onUp=e=>{ if(!dragging.current)return; dragging.current=false; const s=getSnap(e.clientX); onChange(s);animTo(s); };
-
-  const ip=(value/max)*100;
-  return (
-    <div ref={trackRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} style={{position:"relative",height:36,borderRadius:8,cursor:locked?"not-allowed":"pointer",userSelect:"none",touchAction:locked?"pan-y":"none",overflow:"hidden"}}>
-      <div style={{position:"absolute",inset:0,background:"var(--bg-slider)",borderRadius:8}}/>
-      <div ref={fillRef} style={{position:"absolute",left:0,top:0,bottom:0,width:`${ip}%`,background:`linear-gradient(90deg,${color}55,${color}cc)`,borderRadius:8}}/>
-      <div ref={thumbRef} style={{position:"absolute",left:`${ip}%`,top:"50%",transform:"translate(-50%,-50%)",width:22,height:28,background:locked?"#555":color,borderRadius:5,boxShadow:locked?"none":`0 2px 10px ${color}88`,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center",transition:"background 0.2s"}}>
-        {locked?<span style={{fontSize:9,color:"#fff",opacity:0.7}}>🔒</span>:<div style={{width:2,height:10,background:"rgba(0,0,0,0.25)",borderRadius:1}}/>}
+    <div
+      ref={trackRef}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+      onWheel={onWheel} onKeyDown={onKey}
+      tabIndex={locked ? -1 : 0}
+      role="slider"
+      aria-label={ariaLabel || "Hours"}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={formatHours(value)}
+      style={{
+        position:"relative", height:44, borderRadius:12,
+        cursor:locked?"not-allowed":"pointer",
+        userSelect:"none", touchAction:locked?"pan-y":"none",
+        background:"var(--bg-track)", overflow:"visible",
+      }}
+    >
+      <div style={{position:"absolute", inset:0, borderRadius:12, overflow:"hidden"}}>
+        <div ref={fillRef} style={{
+          position:"absolute", left:0, top:0, bottom:0, width:`${ip}%`,
+          background: `linear-gradient(90deg, ${color}66, ${color})`,
+          borderRadius: 12,
+        }}/>
       </div>
+      {/* thumb */}
+      <div ref={thumbRef} style={{
+        position:"absolute", left:`${ip}%`, top:"50%",
+        transform:"translate(-50%,-50%)",
+        width:6, height:32, borderRadius:3,
+        background:locked?"var(--text-4)":"#fff",
+        boxShadow: locked?"none":`0 2px 8px ${color}99, 0 0 0 1px rgba(0,0,0,0.15)`,
+        pointerEvents:"none",
+      }}/>
     </div>
   );
 }
 
-// ── Small components ──────────────────────────────────────────────────────────
-
-function Btn44({ onClick, danger, children, title }) {
-  const bg=danger?"#ff444430":"rgba(128,128,128,0.15)";
-  return <button onClick={onClick} title={title} style={{background:"none",border:"none",width:36,height:36,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"background 0.15s"}} onTouchStart={e=>e.currentTarget.style.background=bg} onTouchEnd={e=>e.currentTarget.style.background="none"} onMouseEnter={e=>e.currentTarget.style.background=bg} onMouseLeave={e=>e.currentTarget.style.background="none"}>{children}</button>;
-}
-
-function TaskCard({ task, taskStart, stepMinutes, dayLen, tasks, T, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd }) {
-  const maxH=tasks.reduce((m,t)=>Math.max(m,t.hours),0), ratio=maxH>0?task.hours/maxH:1;
-  const sliderColor=adjustColor(task.color,(ratio-1)*15,(ratio-1)*55);
+/* ─────────── Task Card ─────────── */
+function TaskCard({ task, taskStart, stepMinutes, dayLen, T_, onChange, onDelete, onEdit, onLock, onFav, isFav, onLongPressStart, onLongPressEnd, isActive, progress }) {
   const taskEnd = taskStart + task.hours;
+  const stepH = stepMinutes / 60;
+  const nudge = (dir) => {
+    if (task.locked) return;
+    const next = Math.max(0, Math.min(dayLen, task.hours + dir * stepH));
+    onChange({ hours: Math.round(next * 60 / stepMinutes) * stepMinutes / 60 });
+  };
   return (
-    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"10px 12px 9px",marginBottom:7,transition:"background 0.25s,border 0.25s",userSelect:"none"}} onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd} onContextMenu={e=>e.preventDefault()}>
-      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
-        <div style={{cursor:"grab",padding:"0 2px",color:T.textFaint,fontSize:14,flexShrink:0,userSelect:"none",touchAction:"none"}}>⠿</div>
-        <button onClick={onEdit} style={{width:16,height:16,borderRadius:"50%",background:task.color,border:"none",flexShrink:0,boxShadow:`0 0 6px ${task.color}88`,padding:0}}/>
-        <div style={{flex:1,minWidth:0}}>
-          <span onClick={onEdit} style={{fontFamily:MONO,fontSize:14,color:T.text,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>{task.name}</span>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:1}}>
-            <span style={{fontFamily:MONO,fontSize:9,color:task.color,opacity:0.85}}>{formatTime(taskStart)}</span>
-            <span style={{fontFamily:MONO,fontSize:9,color:task.color,opacity:0.85}}>{formatTime(taskEnd)}</span>
+    <div className="card no-select task-row" style={{
+      padding:"14px 14px 12px", marginBottom:8,
+      transition:"border-color 0.2s, box-shadow 0.2s",
+      borderColor: isActive ? task.color : "var(--border)",
+      boxShadow: isActive ? `0 0 0 1px ${task.color}55, 0 4px 16px ${task.color}22` : "none",
+      position:"relative", overflow:"hidden",
+    }}
+      onPointerDown={onLongPressStart} onPointerUp={onLongPressEnd} onPointerCancel={onLongPressEnd}
+      onContextMenu={e=>e.preventDefault()}>
+      {/* progress sliver — shows live progress through the task if active */}
+      {isActive && typeof progress === "number" && (
+        <div style={{
+          position:"absolute", left:0, top:0, bottom:0,
+          width: `${Math.max(0, Math.min(100, progress*100))}%`,
+          background: `linear-gradient(90deg, ${task.color}10, ${task.color}05)`,
+          pointerEvents:"none",
+        }}/>
+      )}
+      <div style={{display:"flex", alignItems:"center", gap:10, marginBottom:10, position:"relative"}}>
+        <button onClick={onEdit} aria-label="Edit color" style={{
+          width:14, height:14, borderRadius:"50%", background:task.color,
+          border:"none", flexShrink:0, padding:0, cursor:"pointer",
+          boxShadow:`0 0 0 2px ${task.color}33`,
+        }}/>
+        <div style={{flex:1, minWidth:0}}>
+          <div onClick={onEdit} style={{
+            fontSize:15, fontWeight:500, color:"var(--text)",
+            letterSpacing:"-0.01em", overflow:"hidden", textOverflow:"ellipsis",
+            whiteSpace:"nowrap", cursor:"pointer", marginBottom:2,
+            display:"flex", alignItems:"center", gap:8,
+          }}>
+            <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{task.name}</span>
+            {isActive && (
+              <span style={{
+                display:"inline-flex", alignItems:"center", gap:4,
+                padding:"2px 7px", borderRadius:999,
+                background:`${task.color}22`, color:task.color,
+                fontFamily:"var(--font-mono)", fontSize:9, fontWeight:600,
+                letterSpacing:"0.08em", flexShrink:0,
+              }}>
+                <span style={{width:5, height:5, borderRadius:"50%", background:task.color, animation:"pulse 1.6s ease-in-out infinite"}}/>
+                NOW
+              </span>
+            )}
+          </div>
+          <div style={{display:"flex", gap:8, alignItems:"center", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--text-3)"}}>
+            <span className="tnum">{formatTime(taskStart)}</span>
+            <span style={{opacity:0.4}}>→</span>
+            <span className="tnum">{formatTime(taskEnd)}</span>
+            <span style={{opacity:0.4, margin:"0 4px"}}>·</span>
+            <span className="tnum" style={{color:task.color, fontWeight:500}}>{formatHours(task.hours)}</span>
           </div>
         </div>
-        <div style={{display:"flex",gap:0,flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
-          {!isFav&&<Btn44 onClick={onFav} title="Save as favourite"><span style={{fontSize:12,opacity:0.3}}>★</span></Btn44>}
-          <Btn44 onClick={onLock} title={task.locked?"Unlock":"Lock"}><span style={{fontSize:12,opacity:task.locked?1:0.3}}>🔒</span></Btn44>
-          {!task.locked&&<Btn44 onClick={onDelete} danger title="Delete"><span style={{fontSize:11,color:T.textDim}}>✕</span></Btn44>}
+        <div style={{display:"flex", gap:2, flexShrink:0}} onPointerDown={e=>e.stopPropagation()}>
+          {/* Nudge buttons — keyboard/mouse-friendly fine adjust */}
+          {!task.locked && (
+            <div className="row-nudge" style={{display:"flex", gap:1, marginRight:4}}>
+              <button onClick={()=>nudge(-1)} aria-label={`Decrease ${task.name}`} className="btn btn-ghost btn-icon" style={{
+                width:30, minHeight:30, borderRadius:8, border:"1px solid var(--border)",
+                color:"var(--text-3)", padding:0,
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+              <button onClick={()=>nudge(1)} aria-label={`Increase ${task.name}`} className="btn btn-ghost btn-icon" style={{
+                width:30, minHeight:30, borderRadius:8, border:"1px solid var(--border)",
+                color:"var(--text-3)", padding:0,
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+            </div>
+          )}
+          <button onClick={onFav} aria-label={isFav?"Remove favourite":"Save favourite"} className="btn btn-ghost btn-icon" style={{
+            width:36, minHeight:36, borderRadius:8, border:"none",
+            color: isFav?"var(--accent-3)":"var(--text-4)",
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button onClick={onLock} aria-label={task.locked?"Unlock":"Lock"} className="btn btn-ghost btn-icon" style={{
+            width:36, minHeight:36, borderRadius:8, border:"none",
+            color: task.locked?"var(--accent-2)":"var(--text-4)",
+          }}>
+            {task.locked
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+            }
+          </button>
+          {!task.locked && (
+            <button onClick={onDelete} aria-label="Delete" className="btn btn-ghost btn-icon" style={{
+              width:36, minHeight:36, borderRadius:8, border:"none",
+              color: "var(--text-4)",
+            }} onMouseEnter={e=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={e=>e.currentTarget.style.color="var(--text-4)"}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
         </div>
       </div>
-      <div onPointerDown={e=>e.stopPropagation()} style={{marginBottom:2}}>
-        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={sliderColor} locked={task.locked} onChange={h=>onChange({hours:h})}/>
+      <div onPointerDown={e=>e.stopPropagation()}>
+        <Slider value={task.hours} max={dayLen} step={stepMinutes} color={task.color} locked={task.locked}
+          ariaLabel={`${task.name} hours`}
+          onChange={h=>onChange({hours:h})}/>
       </div>
     </div>
   );
 }
 
-function EditModal({ task, T, onSave, onClose, onSchedule }) {
-  const [name,setName]=useState(task.name), [color,setColor]=useState(task.color);
-  const [showSched,setShowSched]=useState(false), [schedDate,setSchedDate]=useState(tomorrowStr());
-  const save=()=>onSave({name:name.trim()||task.name,color});
-  const doSchedule=()=>{ if(schedDate) onSchedule(schedDate); };
+/* ─────────── Edit Modal ─────────── */
+function EditModal({ task, onSave, onClose, onSchedule }) {
+  const [name, setName] = useState(task.name);
+  const [color, setColor] = useState(task.color);
+  const [showSched, setShowSched] = useState(false);
+  const [schedDate, setSchedDate] = useState(tomorrowStr());
+  const save = () => onSave({ name: name.trim()||task.name, color });
+
   return (
     <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:24,maxHeight:"92dvh",overflowY:"auto"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <span style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:T.text}}>EDIT TASK</span>
-          <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-        </div>
-        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:6}}>TASK NAME</label>
-        <input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 14px",color:T.text,fontFamily:MONO,fontSize:15,marginBottom:20}}/>
-        <label style={{fontSize:10,color:T.textDim,letterSpacing:2,display:"block",marginBottom:10}}>COLOR</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:10,marginBottom:20}}>
-          {PALETTE.map(c=><button key={c} onClick={()=>setColor(c)} style={{width:36,height:36,borderRadius:"50%",background:c,border:color===c?`3px solid ${T.text}`:"2px solid transparent",padding:0,boxShadow:color===c?`0 0 0 2px ${T.bg}, 0 0 0 4px ${c}`:"none",transition:"all 0.15s"}}/>)}
+      <div className="modal-sheet" style={{padding:"24px 24px 28px"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20}}>
+          <h2 style={{fontSize:20, fontWeight:600, letterSpacing:"-0.02em"}}>Edit task</h2>
+          <button onClick={onClose} className="btn btn-ghost btn-icon" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
-        {/* ── Schedule section ─────────────────────────────── */}
-        <div style={{marginBottom:20}}>
-          <button onClick={()=>setShowSched(s=>!s)} style={{width:"100%",background:showSched?`${color}18`:"none",border:`1px solid ${showSched?color:T.borderMid}`,borderRadius:10,padding:"11px 16px",color:showSched?color:T.textMuted,fontFamily:MONO,fontSize:11,letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",transition:"all 0.2s"}}>
-            <span>📅 SCHEDULE FOR ANOTHER DAY</span>
-            <span style={{fontSize:11}}>{showSched?"▲":"▼"}</span>
+        <div className="label" style={{marginBottom:8}}>Name</div>
+        <input className="input" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} style={{marginBottom:20}}/>
+
+        <div className="label" style={{marginBottom:10}}>Color</div>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(7, 1fr)", gap:8, marginBottom:24}}>
+          {PALETTE.map(c => (
+            <button key={c} onClick={()=>setColor(c)} aria-label={`Color ${c}`} style={{
+              width:"100%", aspectRatio:"1", minHeight:36, borderRadius:"50%",
+              background:c, border:color===c?"2px solid var(--text)":"2px solid transparent",
+              boxShadow: color===c?"0 0 0 2px var(--bg-elev), 0 0 0 4px "+c+"66":"none",
+              transition:"all 0.15s", padding:0, cursor:"pointer",
+            }}/>
+          ))}
+        </div>
+
+        <button onClick={()=>setShowSched(s=>!s)} className="btn" style={{width:"100%", marginBottom:showSched?8:24, justifyContent:"space-between"}}>
+          <span style={{display:"flex", alignItems:"center", gap:8}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Schedule for another day
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform:showSched?"rotate(180deg)":"none", transition:"transform 0.2s"}}><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        {showSched && (
+          <div className="card" style={{padding:14, marginBottom:24, animation:"fadeUp 0.18s"}}>
+            <div className="label" style={{marginBottom:8}}>Target date</div>
+            <input type="date" value={schedDate} min={tomorrowStr()} onChange={e=>setSchedDate(e.target.value)}
+              className="input" style={{marginBottom:12, fontFamily:"var(--font-mono)", colorScheme:"dark"}}/>
+            <div style={{fontSize:12, color:"var(--text-3)", lineHeight:1.6, marginBottom:12}}>
+              Moves the task to <span style={{color:color, fontWeight:500}}>{formatDateShort(schedDate)}</span> with its current time and color.
+            </div>
+            <button onClick={()=>schedDate && onSchedule(schedDate)} className="btn btn-primary" style={{width:"100%"}}>
+              Move to {formatDateShort(schedDate)}
+            </button>
+          </div>
+        )}
+
+        <button onClick={save} className="btn btn-primary" style={{width:"100%", minHeight:52, fontSize:15}}>Save changes</button>
+        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Sync Modal ─────────── */
+function SyncModal({ state, onImport, onClose }) {
+  const [mode, setMode] = useState("export");
+  const [importStr, setImportStr] = useState("");
+  const [importMode, setImportMode] = useState("full");
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const syncStr = encodeSync(state);
+
+  const handleCopy = () => {
+    if (!syncStr) return;
+    navigator.clipboard?.writeText(syncStr).then(()=>setCopied(true));
+    setTimeout(()=>setCopied(false), 2000);
+  };
+  const handleImport = (val) => {
+    setImportStr(val); setErr(null); setPreview(null);
+    if (!val.trim()) return;
+    const d = decodeSync(val);
+    if (!d) { setErr("Invalid code — make sure it's complete."); return; }
+    setPreview(d);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{padding:"24px 0 24px"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 24px", marginBottom:18}}>
+          <h2 style={{fontSize:20, fontWeight:600, letterSpacing:"-0.02em"}}>Sync &amp; backup</h2>
+          <button onClick={onClose} className="btn btn-ghost btn-icon" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
-          {showSched&&(
-            <div style={{marginTop:8,padding:"14px",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,animation:"slideIn 0.15s ease"}}>
-              <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>SELECT TARGET DATE</div>
-              <input
-                type="date"
-                value={schedDate}
-                min={tomorrowStr()}
-                onChange={e=>setSchedDate(e.target.value)}
-                style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",color:T.text,fontFamily:MONO,fontSize:13,marginBottom:10,colorScheme:"dark"}}
-              />
-              <div style={{fontFamily:MONO,fontSize:9,color:T.textFaint,lineHeight:1.7,marginBottom:12}}>
-                The task will be removed from today and will appear on <span style={{color:color}}>{formatDateShort(schedDate)}</span> in the calendar — with its original time and color.
+        </div>
+
+        <div className="tab-bar" style={{borderBottom:"1px solid var(--border)", padding:"0 20px", marginBottom:20}}>
+          <button className={`tab ${mode==="export"?"active":""}`} onClick={()=>setMode("export")}>Export</button>
+          <button className={`tab ${mode==="import"?"active":""}`} onClick={()=>setMode("import")}>Import</button>
+        </div>
+
+        <div style={{padding:"0 24px"}}>
+          {mode==="export" ? (
+            <div>
+              <p style={{fontSize:13, color:"var(--text-3)", lineHeight:1.6, marginBottom:14}}>
+                Copy this code to back up or restore everything (tasks, favourites, settings) on another device.
+              </p>
+              <textarea readOnly value={syncStr||""} className="input"
+                style={{height:96, padding:12, fontFamily:"var(--font-mono)", fontSize:11, lineHeight:1.5, marginBottom:12, resize:"none"}}/>
+              <button onClick={handleCopy} className="btn btn-primary" style={{width:"100%", minHeight:52}}>
+                {copied ? "Copied" : "Copy code"}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p style={{fontSize:13, color:"var(--text-3)", lineHeight:1.6, marginBottom:14}}>
+                Paste your code, then choose how to import.
+              </p>
+              <textarea value={importStr} onChange={e=>handleImport(e.target.value)}
+                placeholder="Paste code here…" className="input"
+                style={{height:96, padding:12, fontFamily:"var(--font-mono)", fontSize:11, lineHeight:1.5, marginBottom:8, resize:"none",
+                        borderColor: err?"var(--danger)":preview?"var(--accent-2)":"var(--border)"}}/>
+              {err && <div style={{fontSize:12, color:"var(--danger)", marginBottom:12}}>{err}</div>}
+              {preview && (
+                <div className="card" style={{padding:"10px 12px", marginBottom:14, fontSize:12, color:"var(--text-3)"}}>
+                  <span style={{color:"var(--accent-2)"}}>✓ Valid </span>·{" "}
+                  {preview.tasks?.length ?? 0} tasks, {preview.favs?.length ?? 0} favourites
+                </div>
+              )}
+              <div className="label" style={{marginBottom:8}}>Mode</div>
+              <div style={{display:"flex", flexDirection:"column", gap:6, marginBottom:18}}>
+                {[["full","Replace all","Overwrites existing data"],
+                  ["merge","Merge new only","Adds only what's missing"]].map(([v,t,d])=>(
+                  <button key={v} onClick={()=>setImportMode(v)}
+                    style={{
+                      background: importMode===v?"var(--bg-elev-2)":"transparent",
+                      border:`1px solid ${importMode===v?"var(--accent)":"var(--border)"}`,
+                      borderRadius:10, padding:"12px 14px", textAlign:"left", cursor:"pointer",
+                      transition:"all 0.15s",
+                    }}>
+                    <div style={{fontSize:14, fontWeight:500, color:importMode===v?"var(--accent)":"var(--text)"}}>{t}</div>
+                    <div style={{fontSize:12, color:"var(--text-3)", marginTop:2}}>{d}</div>
+                  </button>
+                ))}
               </div>
-              <button onClick={doSchedule} style={{width:"100%",background:color,border:"none",borderRadius:10,padding:"13px",color:"#000",fontFamily:MONO,fontSize:12,fontWeight:"bold",letterSpacing:1,cursor:"pointer",transition:"opacity 0.2s"}} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                → MOVE TO {formatDateShort(schedDate).toUpperCase()}
+              <button onClick={()=>{ if(preview) { onImport(preview, importMode); onClose(); } }}
+                className="btn btn-primary" disabled={!preview}
+                style={{width:"100%", minHeight:52, opacity:preview?1:0.4, cursor:preview?"pointer":"not-allowed"}}>
+                Import
               </button>
             </div>
           )}
         </div>
-
-        <button onClick={save} style={{width:"100%",background:"#FF6B2B",border:"none",borderRadius:12,padding:"15px",color:"#000",fontFamily:MONO,fontSize:14,fontWeight:"bold",letterSpacing:1,minHeight:52}}>SAVE CHANGES</button>
         <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
       </div>
     </div>
   );
 }
 
-// ── Sync Modal ────────────────────────────────────────────────────────────────
-
-function SyncModal({ T, dark, state, onImport, onClose }) {
-  const [mode, setMode] = useState("export"); // "export" | "import"
-  const [importStr, setImportStr] = useState("");
-  const [importMode, setImportMode] = useState("full"); // "full" | "merge"
-  const [copied, setCopied] = useState(false);
-  const [importErr, setImportErr] = useState(null);
-  const [importPreview, setImportPreview] = useState(null);
-  const syncStr = encodeSyncString(state);
-  const textareaRef = useRef();
-
-  const handleCopy = () => {
-    if (!syncStr) return;
-    navigator.clipboard?.writeText(syncStr).then(()=>setCopied(true)).catch(()=>{
-      if (textareaRef.current) { textareaRef.current.select(); document.execCommand("copy"); setCopied(true); }
-    });
-    setTimeout(()=>setCopied(false), 2000);
-  };
-
-  const handleImportStrChange = (val) => {
-    setImportStr(val);
-    setImportErr(null);
-    setImportPreview(null);
-    if (!val.trim()) return;
-    const decoded = decodeSyncString(val);
-    if (!decoded) { setImportErr("Invalid code — make sure it's complete."); return; }
-    setImportPreview(decoded);
-  };
-
-  const handleImport = () => {
-    if (!importPreview) return;
-    onImport(importPreview, importMode);
-    onClose();
-  };
-
-  const tabStyle = (active) => ({
-    flex:1, padding:"9px 0", background:"none", border:"none",
-    borderBottom: active ? "2px solid #FF6B2B" : `2px solid transparent`,
-    color: active ? "#FF6B2B" : T.textMuted,
-    fontFamily:MONO, fontSize:11, letterSpacing:1, cursor:"pointer",
-    transition:"all 0.15s",
-  });
-
+/* ─────────── Timeline strip ─────────── */
+function Timeline({ tasks, dayLen, dayStart }) {
+  let cursor = 0;
+  const segs = tasks.filter(t=>t.hours>0.02).map(t => { const s=cursor; cursor+=t.hours; return {...t, start:s}; });
+  const ticks = [0, .25, .5, .75, 1].map(f => Math.round((dayStart+f*dayLen)*2)/2);
   return (
-    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal-sheet" style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:"16px 16px 0 0",padding:"0 0 16px"}}>
-        {/* Header */}
-        <div style={{padding:"20px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <span style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:T.text}}>SYNC / BACKUP</span>
-          <button onClick={onClose} style={{background:"none",border:"none",color:T.textMuted,fontSize:22,width:44,height:44,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,marginBottom:20,padding:"0 4px"}}>
-          <button style={tabStyle(mode==="export")} onClick={()=>setMode("export")}>⬆ EXPORT</button>
-          <button style={tabStyle(mode==="import")} onClick={()=>setMode("import")}>⬇ IMPORT</button>
-        </div>
-
-        <div style={{padding:"0 20px"}}>
-          {mode === "export" && (
-            <div>
-              <p style={{fontFamily:MONO,fontSize:10,color:T.textMuted,lineHeight:1.7,marginBottom:14}}>
-                This code contains everything: tasks, favourites, settings. Copy it and paste it on another device.
-              </p>
-              <textarea
-                ref={textareaRef}
-                readOnly
-                value={syncStr||""}
-                style={{width:"100%",height:88,resize:"none",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px",color:T.textDim,fontFamily:MONO,fontSize:9,lineHeight:1.5,letterSpacing:0.3,marginBottom:12}}
-              />
-              <button
-                onClick={handleCopy}
-                style={{width:"100%",background:copied?"#4ECDC4":"#FF6B2B",border:"none",borderRadius:12,padding:"14px",color:"#000",fontFamily:MONO,fontSize:13,fontWeight:"bold",letterSpacing:1,minHeight:50,transition:"background 0.2s"}}
-              >{copied ? "✓ COPIED!" : "📋 COPY CODE"}</button>
+    <div className="card" style={{padding:"14px", marginBottom:16}}>
+      <div style={{position:"relative", height:32, borderRadius:8, overflow:"hidden", background:"var(--bg-track)", marginBottom:8, display:"flex"}}>
+        {segs.map(s => {
+          const w = (s.hours/dayLen)*100;
+          return (
+            <div key={s.id} title={`${s.name} · ${formatHours(s.hours)}`} style={{
+              width:`${w}%`, height:"100%", background:s.color,
+              display:"flex", alignItems:"center", justifyContent:"flex-start", overflow:"hidden",
+              borderRight:"1px solid var(--bg-elev)",
+            }}>
+              {w>10 && <span style={{fontSize:11, color:"rgba(0,0,0,0.7)", fontWeight:600, padding:"0 8px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{s.name}</span>}
             </div>
-          )}
-
-          {mode === "import" && (
-            <div>
-              <p style={{fontFamily:MONO,fontSize:10,color:T.textMuted,lineHeight:1.7,marginBottom:14}}>
-                Paste your exported code below, then choose how to import it.
-              </p>
-              <textarea
-                value={importStr}
-                onChange={e=>handleImportStrChange(e.target.value)}
-                placeholder="Paste code here…"
-                style={{width:"100%",height:88,resize:"none",background:T.bgInput,border:`1px solid ${importErr?"#ff5555":importPreview?"#4ECDC4":T.border}`,borderRadius:10,padding:"12px",color:T.text,fontFamily:MONO,fontSize:9,lineHeight:1.5,marginBottom:8,transition:"border-color 0.2s"}}
-              />
-              {importErr && <div style={{fontFamily:MONO,fontSize:10,color:"#ff6666",marginBottom:10}}>{importErr}</div>}
-              {importPreview && (
-                <div style={{background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",marginBottom:14,animation:"slideIn 0.15s ease"}}>
-                  <div style={{fontFamily:MONO,fontSize:9,color:"#4ECDC4",marginBottom:6,letterSpacing:1}}>✓ VALID CODE</div>
-                  <div style={{fontFamily:MONO,fontSize:10,color:T.textMuted}}>
-                    {importPreview.tasks?.length ?? 0} tasks · {importPreview.favs?.length ?? 0} favourites
-                    {importPreview.ts && <span style={{opacity:0.6}}> · {new Date(importPreview.ts).toLocaleDateString("en-GB")}</span>}
-                  </div>
-                </div>
-              )}
-
-              {/* Import mode selector */}
-              <div style={{marginBottom:16}}>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>IMPORT MODE</div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {[
-                    ["full","🔄 Full replace","Overwrites all existing data"],
-                    ["merge","➕ New items only","Keeps existing, adds only what's missing"],
-                  ].map(([val,label,desc])=>(
-                    <button key={val} onClick={()=>setImportMode(val)} style={{background:importMode===val?`${T.bgSlider}`:"none",border:`1px solid ${importMode===val?"#FF6B2B":T.border}`,borderRadius:10,padding:"10px 14px",textAlign:"left",display:"flex",flexDirection:"column",gap:3,transition:"all 0.15s",cursor:"pointer"}}>
-                      <span style={{fontFamily:MONO,fontSize:11,color:importMode===val?"#FF6B2B":T.text,fontWeight:"bold"}}>{label}</span>
-                      <span style={{fontFamily:MONO,fontSize:9,color:T.textFaint}}>{desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleImport}
-                disabled={!importPreview}
-                style={{width:"100%",background:importPreview?"#FF6B2B":"#333",border:"none",borderRadius:12,padding:"14px",color:importPreview?"#000":"#666",fontFamily:MONO,fontSize:13,fontWeight:"bold",letterSpacing:1,minHeight:50,transition:"all 0.2s",cursor:importPreview?"pointer":"not-allowed"}}
-              >IMPORT</button>
-            </div>
-          )}
-        </div>
-        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
-      </div>
-    </div>
-  );
-}
-
-function Timeline({ tasks, T, dayLen, dayStart }) {
-  let cursor=0;
-  const segs=tasks.filter(t=>t.hours>0.02).map(t=>{const s=cursor;cursor+=t.hours;return{...t,start:s};});
-  const ticks=[0,.25,.5,.75,1].map(f=>Math.round((dayStart+f*dayLen)*2)/2);
-  return (
-    <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 14px 10px",marginBottom:16}}>
-      <div style={{position:"relative",height:36,borderRadius:6,overflow:"hidden",background:T.bgSlider,marginBottom:6}}>
-        {segs.map(s=>{
-          const left=(s.start/dayLen)*100, w=(s.hours/dayLen)*100;
-          return <div key={s.id} style={{position:"absolute",left:`${left}%`,width:`${w}%`,top:0,bottom:0,background:s.done?"#444":s.color,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",minWidth:2,opacity:s.done?.45:1}}>{w>7&&<span style={{fontSize:9,color:"rgba(0,0,0,0.65)",fontFamily:MONO,whiteSpace:"nowrap",padding:"0 4px",fontWeight:"bold"}}>{s.name}</span>}</div>;
+          );
         })}
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",fontFamily:MONO,fontSize:9,color:T.textFaint,paddingLeft:2,paddingRight:2}}>
-        {ticks.map((h,i)=><span key={i}>{String(Math.floor(h)).padStart(2,"0")}:{h%1?"30":"00"}</span>)}
+      <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize:10, color:"var(--text-4)"}}>
+        {ticks.map((h,i)=>(
+          <span key={i} className="tnum">{String(Math.floor(h)).padStart(2,"0")}:{h%1?"30":"00"}</span>
+        ))}
       </div>
     </div>
   );
 }
 
-// ── Week View ─────────────────────────────────────────────────────────────────
-
-function WeekTaskRow({ task, T, stepMinutes, dayTotalHours, onHoursChange, onDelete }) {
+/* ─────────── Week / Month ─────────── */
+function WeekTaskRow({ task, step, onHoursChange, onDelete }) {
   return (
-    <div style={{marginBottom:6}}>
-      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-        <div style={{width:8,height:8,borderRadius:"50%",background:task.color,flexShrink:0,boxShadow:`0 0 4px ${task.color}66`}}/>
-        <span style={{fontFamily:MONO,fontSize:11,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.name}</span>
-        <span style={{fontFamily:MONO,fontSize:10,color:task.color,fontWeight:"bold",flexShrink:0}}>{formatHours(task.hours)}</span>
-        <button onClick={onDelete} style={{background:"none",border:"none",width:24,height:24,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:T.textDim,fontSize:10,cursor:"pointer",flexShrink:0,padding:0}} onMouseEnter={e=>e.currentTarget.style.color="#ff5555"} onMouseLeave={e=>e.currentTarget.style.color=T.textDim}>✕</button>
+    <div style={{marginBottom:8}}>
+      <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:5}}>
+        <div style={{width:8, height:8, borderRadius:"50%", background:task.color, flexShrink:0}}/>
+        <span style={{fontSize:13, color:"var(--text)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{task.name}</span>
+        <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:task.color, fontWeight:500, flexShrink:0}} className="tnum">{formatHours(task.hours)}</span>
+        <button onClick={onDelete} aria-label="Delete" className="btn btn-ghost btn-icon" style={{width:30, minHeight:30, color:"var(--text-4)"}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <Slider value={task.hours} max={Math.max(task.hours, 12)} step={stepMinutes} color={task.color} locked={false} onChange={onHoursChange}/>
+      <Slider value={task.hours} max={Math.max(task.hours, 12)} step={step} color={task.color} locked={false} onChange={onHoursChange}/>
     </div>
   );
 }
 
-function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [newName, setNewName] = React.useState("");
+function DayCard({ dayData, dayIdx, step, todayTasks, isToday, onUpdate }) {
+  const [expanded, setExpanded] = useState(false);
+  const [newName, setNewName] = useState("");
   const total = weekTotalHours(dayData);
   const taskCount = dayData.tasks.length;
   const hasNote = dayData.note && dayData.note.trim().length > 0;
@@ -949,176 +1182,129 @@ function DayCard({ dayData, dayIdx, T, dark, step, todayTasks, isToday, onUpdate
     const copied = todayTasks.map(t => ({...t, id: Date.now() + Math.random(), done: false}));
     onUpdate({ tasks: copied });
   };
-
   const addTask = () => {
-    const name = newName.trim();
-    if (!name) return;
+    const name = newName.trim(); if (!name) return;
     const color = PALETTE[dayData.tasks.length % PALETTE.length];
-    const newTask = { id: Date.now() + Math.random(), name, hours: 1, originalHours: 1, color, locked: false, actual: 0, done: false };
-    onUpdate({ tasks: [...dayData.tasks, newTask] });
+    onUpdate({ tasks: [...dayData.tasks, { id: Date.now()+Math.random(), name, hours:1, originalHours:1, color, locked:false, actual:0 }] });
     setNewName("");
   };
+  const updateTaskHours = (id, hours) => onUpdate({ tasks: dayData.tasks.map(t => t.id===id ? {...t, hours, originalHours:hours} : t) });
+  const deleteTask = id => onUpdate({ tasks: dayData.tasks.filter(t=>t.id!==id) });
 
-  const updateTaskHours = (taskId, hours) => {
-    onUpdate({ tasks: dayData.tasks.map(t => t.id === taskId ? {...t, hours, originalHours: hours} : t) });
-  };
-
-  const deleteTask = (taskId) => {
-    onUpdate({ tasks: dayData.tasks.filter(t => t.id !== taskId) });
-  };
-
-  const updateNote = (note) => onUpdate({ note });
-
-  // Compact bar: colored segments proportional to hours
-  const segments = dayData.tasks.filter(t => t.hours > 0);
+  const segments = dayData.tasks.filter(t=>t.hours>0);
   const segTotal = segments.reduce((s,t)=>s+t.hours,0);
 
   return (
-    <div style={{
-      background: T.bgCard,
-      border: `1px solid ${isToday ? "#FF6B2B" : T.border}`,
-      borderRadius: 12,
-      overflow: "hidden",
-      transition: "border-color 0.2s",
+    <div className="card" style={{
+      borderColor: isToday ? "var(--accent)" : "var(--border)",
+      overflow:"hidden", transition:"border-color 0.2s",
     }}>
-      {/* Day header — always visible */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        style={{
-          width: "100%", background: "none", border: "none", padding: "11px 14px 9px",
-          display: "flex", alignItems: "center", gap: 10, cursor: "pointer", textAlign: "left",
-        }}
-      >
-        {/* Day name */}
-        <div style={{flexShrink:0, minWidth:72}}>
-          <div style={{fontFamily:BEBAS, fontSize:16, letterSpacing:1.5, color: isToday ? "#FF6B2B" : T.text, lineHeight:1}}>{DAYS_HU[dayIdx]}</div>
-          {isToday && <div style={{fontFamily:MONO, fontSize:8, color:"#FF6B2B", letterSpacing:1, marginTop:1}}>MA</div>}
+      <button onClick={()=>setExpanded(v=>!v)} style={{
+        width:"100%", background:"transparent", border:"none", padding:"14px 16px",
+        display:"flex", alignItems:"center", gap:14, cursor:"pointer", textAlign:"left",
+        minHeight: 60,
+      }}>
+        <div style={{flexShrink:0, width:80}}>
+          <div style={{fontSize:14, fontWeight:600, color: isToday?"var(--accent)":"var(--text)", letterSpacing:"-0.01em"}}>
+            {DAYS[dayIdx]}
+          </div>
+          {isToday && <div style={{fontSize:10, color:"var(--accent)", fontFamily:"var(--font-mono)", letterSpacing:"0.08em", marginTop:2}}>TODAY</div>}
         </div>
-
-        {/* Compact bar */}
-        <div style={{flex:1, height:6, borderRadius:4, background:T.bgSlider, overflow:"hidden", position:"relative"}}>
-          {segTotal > 0 ? segments.map((t,i) => {
-            const left = segments.slice(0,i).reduce((s,x)=>s+x.hours,0) / segTotal * 100;
-            const w = t.hours / segTotal * 100;
-            return <div key={t.id} style={{position:"absolute",left:`${left}%`,width:`${w}%`,top:0,bottom:0,background:t.color}}/>;
-          }) : null}
+        <div style={{flex:1, height:6, borderRadius:3, background:"var(--bg-track)", overflow:"hidden", position:"relative"}}>
+          {segTotal>0 && segments.map((t,i)=>{
+            const left = segments.slice(0,i).reduce((s,x)=>s+x.hours,0)/segTotal*100;
+            const w = t.hours/segTotal*100;
+            return <div key={t.id} style={{position:"absolute", left:`${left}%`, width:`${w}%`, top:0, bottom:0, background:t.color}}/>;
+          })}
         </div>
-
-        {/* Stats */}
-        <div style={{fontFamily:MONO, fontSize:10, color: total > 0 ? T.textSub : T.textFaint, flexShrink:0, textAlign:"right", minWidth:52}}>
-          {total > 0 ? <><span style={{color:"#FF6B2B",fontWeight:"bold"}}>{formatHours(total)}</span></> : <span style={{opacity:0.4}}>—</span>}
+        <div style={{flexShrink:0, textAlign:"right", minWidth:60}}>
+          {total>0
+            ? <div className="tnum" style={{fontSize:13, fontWeight:600, color:"var(--accent)"}}>{formatHours(total)}</div>
+            : <div style={{fontSize:13, color:"var(--text-4)"}}>—</div>}
+          {taskCount>0 && <div style={{fontSize:10, color:"var(--text-3)", fontFamily:"var(--font-mono)"}}>{taskCount} task{taskCount>1?"s":""}</div>}
         </div>
-        {taskCount > 0 && <div style={{fontFamily:MONO, fontSize:9, color:T.textFaint, flexShrink:0, minWidth:20, textAlign:"right"}}>{taskCount}✓</div>}
-        {hasNote && <span style={{fontSize:10, flexShrink:0}}>📝</span>}
-        <span style={{color:T.textFaint, fontSize:10, flexShrink:0}}>{expanded?"▲":"▼"}</span>
+        {hasNote && <div style={{flexShrink:0, color:"var(--text-3)"}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          style={{color:"var(--text-3)", flexShrink:0, transform:expanded?"rotate(180deg)":"none", transition:"transform 0.2s"}}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
       </button>
 
-      {/* Expanded content */}
       {expanded && (
-        <div style={{borderTop:`1px solid ${T.border}`, padding:"12px 14px 14px", animation:"slideIn 0.15s ease"}}>
-
-          {/* Tasks */}
-          {dayData.tasks.length > 0 && (
+        <div style={{borderTop:"1px solid var(--border)", padding:"14px 16px", animation:"fadeUp 0.18s"}}>
+          {dayData.tasks.length>0 && (
             <div style={{marginBottom:12}}>
               {dayData.tasks.map(t => (
-                <WeekTaskRow key={t.id} task={t} T={T} stepMinutes={step}
-                  dayTotalHours={total}
-                  onHoursChange={h => updateTaskHours(t.id, h)}
-                  onDelete={() => deleteTask(t.id)}
-                />
+                <WeekTaskRow key={t.id} task={t} step={step}
+                  onHoursChange={h=>updateTaskHours(t.id, h)}
+                  onDelete={()=>deleteTask(t.id)}/>
               ))}
             </div>
           )}
-
-          {/* Add task row */}
-          <div style={{display:"flex",gap:6,marginBottom:10}}>
-            <input
-              value={newName}
-              onChange={e=>setNewName(e.target.value)}
+          <div style={{display:"flex", gap:8, marginBottom:10}}>
+            <input value={newName} onChange={e=>setNewName(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&addTask()}
-              placeholder="Add a task…"
-              style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:12,outline:"none"}}
-              onFocus={e=>e.target.style.borderColor="#FF6B2B"}
-              onBlur={e=>e.target.style.borderColor=T.border}
-            />
-            <button onClick={addTask} style={{background:"#FF6B2B",border:"none",borderRadius:8,padding:"8px 14px",color:"#000",fontFamily:BEBAS,fontSize:15,letterSpacing:1,flexShrink:0,minWidth:52,cursor:"pointer"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"}>ADD</button>
+              placeholder="Add a task…" className="input" style={{minHeight:42, fontSize:14}}/>
+            <button onClick={addTask} className="btn btn-primary" style={{minHeight:42, padding:"0 18px"}}>Add</button>
           </div>
-
-          {/* Copy from today + Note */}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:dayData.note!==undefined?10:0}}>
-            {todayTasks.length > 0 && (
-              <button onClick={copyFromToday} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"5px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>
-                ⎘ copy from today
-              </button>
+          <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:10}}>
+            {todayTasks.length>0 && (
+              <button onClick={copyFromToday} className="btn" style={{minHeight:36, padding:"0 12px", fontSize:12}}>Copy from today</button>
             )}
-            {dayData.tasks.length > 0 && (
-              <button onClick={()=>onUpdate({tasks:[]})} style={{background:"none",border:`1px solid #cc333344`,borderRadius:7,padding:"5px 10px",color:"#cc5555",fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#ff5555";e.currentTarget.style.color="#ff5555";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#cc333344";e.currentTarget.style.color="#cc5555";}}>
-                ✕ clear all
-              </button>
+            {dayData.tasks.length>0 && (
+              <button onClick={()=>onUpdate({tasks:[]})} className="btn btn-danger" style={{minHeight:36, padding:"0 12px", fontSize:12}}>Clear all</button>
             )}
           </div>
-
-          {/* Note */}
-          <textarea
-            value={dayData.note || ""}
-            onChange={e => updateNote(e.target.value)}
-            placeholder="Note for the day…"
-            rows={2}
-            style={{width:"100%",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",color:T.text,fontFamily:MONO,fontSize:11,resize:"none",outline:"none",lineHeight:1.5,marginTop:8}}
-            onFocus={e=>e.target.style.borderColor="#4ECDC4"}
-            onBlur={e=>e.target.style.borderColor=T.border}
-          />
+          <textarea value={dayData.note||""} onChange={e=>onUpdate({note:e.target.value})}
+            placeholder="Note for the day…" rows={2} className="input"
+            style={{padding:"10px 14px", fontSize:13, lineHeight:1.5, resize:"none", minHeight:60}}/>
         </div>
       )}
     </div>
   );
 }
 
-
-// ── Calendar: Month grid ──────────────────────────────────────────────────────
-
-function MonthView({ T, onDateSelect, activeDate }) {
+function MonthView({ onDateSelect, activeDate }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const today = todayStr();
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-  const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y-1); setViewMonth(11); } else setViewMonth(m => m-1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y+1); setViewMonth(0); } else setViewMonth(m => m+1); };
+  const prevMonth = () => { if (viewMonth===0) { setViewYear(y=>y-1); setViewMonth(11); } else setViewMonth(m=>m-1); };
+  const nextMonth = () => { if (viewMonth===11) { setViewYear(y=>y+1); setViewMonth(0); } else setViewMonth(m=>m+1); };
 
   const firstDay = new Date(viewYear, viewMonth, 1);
   const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
-  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
+  let startDow = firstDay.getDay()-1; if (startDow<0) startDow=6;
   const cells = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
+  for (let i=0;i<startDow;i++) cells.push(null);
+  for (let d=1;d<=daysInMonth;d++) cells.push(d);
+  while (cells.length%7!==0) cells.push(null);
 
   const getDs = day => `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-  // Read dots directly from per-date storage (computed once per render)
   const datesWithTasks = getDatesWithTasks();
 
   return (
-    <div style={{ padding: "12px 16px", paddingBottom: 100 }}>
-      {/* Month nav */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <button onClick={prevMonth} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, width: 36, height: 36, color: T.textMuted, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-        <span style={{ fontFamily: BEBAS, fontSize: 22, letterSpacing: 2, color: T.text }}>{monthNames[viewMonth]} {viewYear}</span>
-        <button onClick={nextMonth} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, width: 36, height: 36, color: T.textMuted, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+    <div style={{padding:"16px"}}>
+      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16}}>
+        <button onClick={prevMonth} className="btn btn-ghost btn-icon" aria-label="Previous month">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div style={{fontSize:18, fontWeight:600, letterSpacing:"-0.02em"}}>{monthNames[viewMonth]} {viewYear}</div>
+        <button onClick={nextMonth} className="btn btn-ghost btn-icon" aria-label="Next month">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
       </div>
-
-      {/* Day headers */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 3 }}>
-        {["M","T","W","Th","F","Sa","Su"].map((h,i) => (
-          <div key={i} style={{ textAlign: "center", fontFamily: MONO, fontSize: 9, color: T.textFaint, letterSpacing: 0.5, padding: "3px 0" }}>{h}</div>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:6}}>
+        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((h,i)=>(
+          <div key={i} style={{textAlign:"center", fontFamily:"var(--font-mono)", fontSize:10, color:"var(--text-4)", letterSpacing:"0.04em", padding:"4px 0"}}>{h}</div>
         ))}
       </div>
-
-      {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4}}>
         {cells.map((day, idx) => {
-          if (!day) return <div key={`e-${idx}`} style={{ minHeight: 52 }} />;
+          if (!day) return <div key={`e-${idx}`} style={{minHeight:54}}/>;
           const ds = getDs(day);
           const dayTasks = datesWithTasks[ds] || [];
           const isToday = ds === today;
@@ -1126,491 +1312,703 @@ function MonthView({ T, onDateSelect, activeDate }) {
           const hasTasks = dayTasks.length > 0;
           const isPast = ds < today;
           return (
-            <button key={ds} onClick={() => onDateSelect(ds)}
-              style={{ background: isActive ? "#FF6B2B33" : isToday ? "#FF6B2B18" : hasTasks ? T.bgCard : "none", border: `1px solid ${isActive ? "#FF6B2B" : isToday ? "#FF6B2B66" : hasTasks ? T.border : "transparent"}`, borderRadius: 10, padding: "7px 2px 5px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minHeight: 52, transition: "all 0.15s", opacity: isPast && !hasTasks && !isToday ? 0.45 : 1 }}
-              onMouseEnter={e => { e.currentTarget.style.background = isActive?"#FF6B2B33":T.bgCard; e.currentTarget.style.borderColor = isActive?"#FF6B2B":T.borderMid; }}
-              onMouseLeave={e => { e.currentTarget.style.background = isActive?"#FF6B2B33":isToday?"#FF6B2B18":hasTasks?T.bgCard:"none"; e.currentTarget.style.borderColor = isActive?"#FF6B2B":isToday?"#FF6B2B66":hasTasks?T.border:"transparent"; }}>
-              <span style={{ fontFamily: MONO, fontSize: 12, color: isActive||isToday ? "#FF6B2B" : hasTasks ? T.text : T.textFaint, fontWeight: isActive||isToday ? "bold" : "normal" }}>{day}</span>
-              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", minHeight: 8 }}>
-                {dayTasks.slice(0, 3).map((t, i) => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: t.color }} />)}
-                {dayTasks.length > 3 && <span style={{ fontSize: 7, color: T.textFaint, fontFamily: MONO, lineHeight: "6px" }}>+{dayTasks.length-3}</span>}
+            <button key={ds} onClick={()=>onDateSelect(ds)} style={{
+              background: isActive?"color-mix(in oklab, var(--accent) 25%, transparent)":isToday?"color-mix(in oklab, var(--accent) 12%, transparent)":hasTasks?"var(--bg-elev-2)":"transparent",
+              border:`1px solid ${isActive?"var(--accent)":isToday?"color-mix(in oklab, var(--accent) 50%, transparent)":hasTasks?"var(--border)":"transparent"}`,
+              borderRadius:10, padding:"6px 4px", cursor:"pointer",
+              display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+              minHeight:54, transition:"all 0.15s",
+              opacity:isPast&&!hasTasks&&!isToday?0.4:1,
+            }}>
+              <span className="tnum" style={{fontSize:13, color:isActive||isToday?"var(--accent)":hasTasks?"var(--text)":"var(--text-3)", fontWeight:isActive||isToday?600:400}}>{day}</span>
+              <div style={{display:"flex", gap:2, justifyContent:"center", minHeight:8, flexWrap:"wrap"}}>
+                {dayTasks.slice(0,4).map((t,i)=><div key={i} style={{width:5, height:5, borderRadius:"50%", background:t.color}}/>)}
+                {dayTasks.length>4 && <span style={{fontSize:8, color:"var(--text-4)", fontFamily:"var(--font-mono)", lineHeight:"6px"}}>+{dayTasks.length-4}</span>}
               </div>
             </button>
           );
         })}
       </div>
-      <div style={{marginTop:14,fontFamily:MONO,fontSize:9,color:T.textFaint,textAlign:"center",letterSpacing:1}}>TAP A DAY TO VIEW &amp; EDIT ITS TASKS</div>
     </div>
   );
 }
 
-function WeekView({ T, dark, step, todayTasks, onDateSelect, activeDate }) {
-  const [week, setWeek] = React.useState(initWeek);
-  const [weekView, setWeekView] = React.useState("week"); // "week" | "month"
+function WeekView({ step, todayTasks, onDateSelect, activeDate }) {
+  const [week, setWeek] = useState(loadWeek);
+  const [view, setView] = useState("week");
+  useEffect(() => { saveJSON(WEEK_KEY, week); }, [week]);
+  const updateDay = (idx, patch) => setWeek(prev => prev.map((d,i)=>i===idx?{...d,...patch}:d));
 
-  React.useEffect(() => { saveWeek(week); }, [week]);
-
-  const updateDay = (dayIdx, patch) => {
-    setWeek(prev => prev.map((d, i) => i === dayIdx ? {...d, ...patch} : d));
-  };
-
-  // "Today" = current day of week, Mon=0 … Sun=6 (Hungarian convention)
-  const todayDowRaw = new Date().getDay(); // 0=Sun
-  const todayDow = todayDowRaw === 0 ? 6 : todayDowRaw - 1; // convert to Mon=0
-
-  const weekTotal = week.reduce((s, d) => s + weekTotalHours(d), 0);
-  const filledDays = week.filter(d => d.tasks.length > 0).length;
+  const todayDowRaw = new Date().getDay();
+  const todayDow = todayDowRaw===0 ? 6 : todayDowRaw-1;
+  const weekTotal = week.reduce((s,d)=>s+weekTotalHours(d),0);
+  const filledDays = week.filter(d=>d.tasks.length>0).length;
 
   return (
     <div>
-      {/* Hét / Hónap toggle */}
-      <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,padding:"0 16px"}}>
-        {[["week","▦ WEEK"],["month","📅 MONTH"]].map(([v,label])=>(
-          <button key={v} onClick={()=>setWeekView(v)} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${weekView===v?"#4ECDC4":"transparent"}`,padding:"8px 0 6px",color:weekView===v?"#4ECDC4":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s",marginBottom:-1}}>
-            {label}
-          </button>
-        ))}
+      <div className="tab-bar" style={{borderBottom:"1px solid var(--border)", padding:"0 16px"}}>
+        <button className={`tab ${view==="week"?"active":""}`} onClick={()=>setView("week")}>Week</button>
+        <button className={`tab ${view==="month"?"active":""}`} onClick={()=>setView("month")}>Month</button>
       </div>
 
-      {weekView === "month" ? (
-        <MonthView T={T} onDateSelect={onDateSelect} activeDate={activeDate} />
+      {view==="month" ? (
+        <MonthView onDateSelect={onDateSelect} activeDate={activeDate}/>
       ) : (
-    <div style={{padding:"0 16px", paddingBottom:100}}>
-      {/* Week summary bar */}
-      <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12,marginTop:12}}>
-        <div>
-          <div style={{fontFamily:BEBAS,fontSize:22,letterSpacing:2,color:"#FF6B2B",lineHeight:1}}>{formatHours(weekTotal)}</div>
-          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>WEEK TOTAL</div>
+        <div style={{padding:"16px"}}>
+          <div className="card" style={{padding:"14px 16px", marginBottom:14, display:"flex", alignItems:"center", gap:14}}>
+            <div>
+              <div className="tnum" style={{fontSize:22, fontWeight:600, color:"var(--accent)", letterSpacing:"-0.02em", lineHeight:1}}>{formatHours(weekTotal)}</div>
+              <div style={{fontSize:10, color:"var(--text-3)", fontFamily:"var(--font-mono)", letterSpacing:"0.06em", marginTop:3}}>WEEK</div>
+            </div>
+            <div style={{flex:1, height:8, borderRadius:4, background:"var(--bg-track)", overflow:"hidden", display:"flex"}}>
+              {week.map((d,i)=>{
+                const w = weekTotal>0 ? (weekTotalHours(d)/weekTotal*100) : (100/7);
+                const col = d.tasks[0]?.color || "var(--bg-track)";
+                return <div key={i} style={{width:`${w}%`, height:"100%", background:weekTotalHours(d)>0?col:"var(--bg-track)", borderRight:i<6?"1px solid var(--bg-elev)":"none", opacity:weekTotalHours(d)>0?1:0.3}}/>;
+              })}
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div className="tnum" style={{fontSize:14, fontWeight:600}}>{filledDays}<span style={{color:"var(--text-4)", fontWeight:400}}>/7</span></div>
+              <div style={{fontSize:10, color:"var(--text-3)", fontFamily:"var(--font-mono)", letterSpacing:"0.06em"}}>DAYS</div>
+            </div>
+          </div>
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            {week.map((dayData, idx) => (
+              <DayCard key={idx} dayData={dayData} dayIdx={idx} step={step}
+                todayTasks={todayTasks} isToday={idx===todayDow}
+                onUpdate={patch=>updateDay(idx, patch)}/>
+            ))}
+          </div>
         </div>
-        <div style={{flex:1, height:8, borderRadius:4, background:T.bgSlider, overflow:"hidden", display:"flex"}}>
-          {week.map((d,i) => {
-            const w = weekTotal > 0 ? (weekTotalHours(d) / weekTotal * 100) : (100/7);
-            const col = d.tasks[0]?.color || T.bgSlider;
-            return <div key={i} style={{width:`${w}%`,height:"100%",background:weekTotalHours(d)>0?col:T.bgSlider,borderRight:i<6?`1px solid ${T.bg}`:"none",opacity:weekTotalHours(d)>0?1:0.3,transition:"all 0.3s"}}/>;
-          })}
-        </div>
-        <div style={{textAlign:"right",flexShrink:0}}>
-          <div style={{fontFamily:MONO,fontSize:13,color:T.textSub,fontWeight:"bold"}}>{filledDays}<span style={{fontSize:9,color:T.textFaint,fontWeight:"normal"}}>/7</span></div>
-          <div style={{fontFamily:MONO,fontSize:8,color:T.textFaint,letterSpacing:1}}>DAYS FILLED</div>
-        </div>
-      </div>
-
-      {/* Day cards */}
-      <div style={{display:"flex",flexDirection:"column",gap:7}}>
-        {week.map((dayData, dayIdx) => (
-          <DayCard
-            key={dayIdx}
-            dayData={dayData}
-            dayIdx={dayIdx}
-            T={T}
-            dark={dark}
-            step={step}
-            todayTasks={todayTasks}
-            isToday={dayIdx === todayDow}
-            onUpdate={patch => updateDay(dayIdx, patch)}
-          />
-        ))}
-      </div>
-    </div>
       )}
     </div>
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
+/* ─────────── Settings Panel ─────────── */
+function Settings({ step, showTL, dayStart, dayEnd, dispatch, onExport, onImportFile, onSync, onReset, dark }) {
+  const [confirmReset, setConfirmReset] = useState(false);
+  return (
+    <div className="card" style={{padding:"16px 18px", animation:"fadeUp 0.15s", marginBottom:14}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid var(--border)", marginBottom:14}}>
+        <div>
+          <div style={{fontSize:14, fontWeight:500}}>Show timeline</div>
+          <div style={{fontSize:12, color:"var(--text-3)", marginTop:2}}>Linear strip below the donut</div>
+        </div>
+        <button onClick={()=>dispatch({type:"SET_SHOW_TL", v:!showTL})} aria-label="Toggle timeline" style={{
+          width:46, height:26, borderRadius:13, border:"none",
+          background: showTL?"var(--accent)":"var(--bg-track)",
+          position:"relative", cursor:"pointer", transition:"background 0.2s",
+        }}>
+          <div style={{
+            position:"absolute", top:3, left:showTL?23:3,
+            width:20, height:20, borderRadius:"50%", background:"#fff",
+            transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.3)",
+          }}/>
+        </button>
+      </div>
 
+      <div className="label" style={{marginBottom:8}}>Snap size</div>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:6, marginBottom:18}}>
+        {STEPS.map(s => (
+          <button key={s.m} onClick={()=>dispatch({type:"SET_STEP", step:s.m})} style={{
+            minHeight:42, borderRadius:10,
+            background: s.m===step?"var(--accent)":"var(--bg-input)",
+            color: s.m===step?"#0a0b12":"var(--text-2)",
+            border:`1px solid ${s.m===step?"var(--accent)":"var(--border)"}`,
+            fontFamily:"var(--font-mono)", fontSize:13, fontWeight:s.m===step?600:500,
+            cursor:"pointer", transition:"all 0.15s",
+          }}>{s.l}</button>
+        ))}
+      </div>
+
+      <div className="label" style={{marginBottom:8}}>File</div>
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:18}}>
+        <button onClick={onExport} className="btn">Export .md</button>
+        <button onClick={onImportFile} className="btn">Import .md</button>
+      </div>
+
+      <div className="label" style={{marginBottom:8}}>Reset</div>
+      {!confirmReset ? (
+        <button onClick={()=>setConfirmReset(true)} className="btn btn-danger" style={{width:"100%"}}>Reset app data</button>
+      ) : (
+        <div className="card" style={{padding:14, borderColor:"var(--danger)", animation:"fadeUp 0.15s"}}>
+          <div style={{fontSize:13, color:"var(--danger)", marginBottom:12, lineHeight:1.6}}>
+            Reset everything? Tasks, favourites and settings will be wiped.
+          </div>
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={onReset} className="btn" style={{flex:1, background:"var(--danger)", color:"#fff", border:"none"}}>Yes, reset</button>
+            <button onClick={()=>setConfirmReset(false)} className="btn" style={{flex:1}}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────── Help / Shortcuts Modal ─────────── */
+function HelpModal({ onClose }) {
+  const rows = [
+    ["/", "Focus Add-task"],
+    ["N", "Set day start = now"],
+    ["D", "Distribute evenly"],
+    ["T", "Jump to today"],
+    ["W", "Toggle Today / Week"],
+    ["?", "This help"],
+    ["Esc", "Close any sheet"],
+  ];
+  const sliderRows = [
+    ["Drag", "Adjust hours"],
+    ["Click track", "Snap to position"],
+    ["Wheel", "Fine-tune (Shift = ×4)"],
+    ["← →", "Step by snap"],
+    ["Shift +←/→", "Big step"],
+    ["Home / End", "0 / max"],
+  ];
+  return (
+    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal-sheet" style={{padding:"24px 24px 28px"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18}}>
+          <h2 style={{fontSize:20, fontWeight:600, letterSpacing:"-0.02em"}}>Shortcuts</h2>
+          <button onClick={onClose} className="btn btn-ghost btn-icon" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div className="label" style={{marginBottom:10}}>Anywhere</div>
+        <div style={{display:"flex", flexDirection:"column", gap:6, marginBottom:18}}>
+          {rows.map(([k,v],i)=>(
+            <div key={i} style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", background:"var(--bg-input)", borderRadius:10}}>
+              <span className="kbd" style={{minWidth:48, textAlign:"center"}}>{k}</span>
+              <span style={{fontSize:13, color:"var(--text-2)"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="label" style={{marginBottom:10}}>On any slider (hover or focus)</div>
+        <div style={{display:"flex", flexDirection:"column", gap:6}}>
+          {sliderRows.map(([k,v],i)=>(
+            <div key={i} style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", background:"var(--bg-input)", borderRadius:10}}>
+              <span className="kbd" style={{minWidth:96, textAlign:"center"}}>{k}</span>
+              <span style={{fontSize:13, color:"var(--text-2)"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── App ─────────── */
 function App() {
-  const [state,dispatch]=useReducer(reducer,null,initState);
-  const [newName,setNewName]=useState(""), [editTask,setEditTask]=useState(null), [toast,setToast]=useState(null);
-  const [confirmRm,setConfirmRm]=useState(null), [confirmReset,setConfirmReset]=useState(false);
-  const [showSettings,setShowSettings]=useState(false), [showFavs,setShowFavs]=useState(false);
-  const [showSync,setShowSync]=useState(false);
-  const [activeView,setActiveView]=useState("today");
-  const [activeDate,setActiveDate]=useState(todayStr);
-  const [dragOver,setDragOver]=useState(null), [longDragIdx,setLongDragIdx]=useState(null), [dragPos,setDragPos]=useState({x:0,y:0});
-  const [inputFocused,setInputFocused]=useState(false);
-  const activeDateRef=useRef(activeDate);
-  const lpTimer=useRef(null), confirmRmTimer=useRef(null), taskListRef=useRef(), fileRef=useRef(), inputRef=useRef();
+  const [state, dispatch] = useReducer(reducer, null, initState);
+  const [newName, setNewName] = useState("");
+  const [editTask, setEditTask] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showFavs, setShowFavs] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [activeView, setActiveView] = useState("today");
+  const [activeDate, setActiveDate] = useState(todayStr);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [longDragIdx, setLongDragIdx] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  const [dragPos, setDragPos] = useState({x:0,y:0});
+  const [inputFocused, setInputFocused] = useState(false);
+  const [confirmRm, setConfirmRm] = useState(null);
+  const [nowH, setNowH] = useState(() => { const d=new Date(); return d.getHours() + d.getMinutes()/60 + d.getSeconds()/3600; });
+  const activeDateRef = useRef(activeDate);
+  const lpTimer = useRef(null), confirmTimer = useRef(null);
+  const taskListRef = useRef(), fileRef = useRef(), inputRef = useRef();
 
   const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
-  const dl=calcDayLen(dayStart,dayEnd), T=dark?DARK:LIGHT;
-  const total=tasks.reduce((s,t)=>s+t.hours,0), remaining=dl-total;
-  const over=remaining<-TOL, perfect=Math.abs(remaining)<TOL;
+  const dl = calcDayLen(dayStart, dayEnd);
+  const total = tasks.reduce((s,t)=>s+t.hours,0);
+  const remaining = dl - total;
+  const over = remaining < -TOL, perfect = Math.abs(remaining) < TOL;
 
-  // Keep activeDateRef in sync for use in closures
-  useEffect(()=>{ activeDateRef.current = activeDate; }, [activeDate]);
-
-  // Save state keyed by active date whenever state changes
-  useEffect(()=>{
+  useEffect(() => { activeDateRef.current = activeDate; }, [activeDate]);
+  useEffect(() => {
     saveDateState(activeDateRef.current, state);
-    saveState(state); // keep legacy key in sync for today
-  },[state]);
+    saveJSON(STORAGE_KEY, state);
+  }, [state]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", dark?"dark":"light");
+    document.getElementById("themeColorMeta").content = dark?"#131420":"#fdf6ee";
+  }, [dark]);
+
+  // Live clock — update every 30s for the now-indicator on the ring
+  useEffect(() => {
+    const tick = () => { const d = new Date(); setNowH(d.getHours() + d.getMinutes()/60 + d.getSeconds()/3600); };
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      const inForm = tag === "INPUT" || tag === "TEXTAREA" || (e.target && e.target.isContentEditable);
+      if (e.key === "Escape") {
+        if (editTask) setEditTask(null);
+        else if (showSync) setShowSync(false);
+        else if (showHelp) setShowHelp(false);
+        else if (showSettings) setShowSettings(false);
+        else if (showFavs) setShowFavs(false);
+        return;
+      }
+      if (inForm) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "/") { e.preventDefault(); inputRef.current?.focus(); return; }
+      if (e.key === "?") { e.preventDefault(); setShowHelp(v=>!v); return; }
+      if (e.key.toLowerCase() === "d") { e.preventDefault(); dispatch({type:"DISTRIBUTE"}); setToast({msg:"Distributed evenly", type:"ok"}); setTimeout(()=>setToast(null), TOAST_MS); return; }
+      if (e.key.toLowerCase() === "t") { e.preventDefault(); if (!isTodayDate) {
+        saveDateState(activeDateRef.current, state);
+        const loaded = loadDateState(todayStr());
+        const next = loaded ? {...loaded, favs:state.favs, step:state.step, dark:state.dark} : blankDayState(state);
+        dispatch({type:"FULL_REPLACE", data:next});
+        setActiveDate(todayStr()); setActiveView("today"); setSelectedTaskId(null);
+      } else { setActiveView("today"); } return; }
+      if (e.key.toLowerCase() === "w") { e.preventDefault(); setActiveView(v=>v==="week"?"today":"week"); return; }
+      if (e.key.toLowerCase() === "n") { e.preventDefault();
+        const m=Math.floor(nowH*60); const newStart = Math.min(Math.ceil(m/state.step)*state.step/60, 23.5);
+        dispatch({type:"SET_DAY_WINDOW", start:newStart, end:state.dayEnd});
+        setToast({msg:"Start = now", type:"ok"}); setTimeout(()=>setToast(null), TOAST_MS); return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editTask, showSync, showHelp, showSettings, showFavs, isTodayDate, state, nowH]);
+
+  // Compute which task is "now" (only when viewing today, in-window)
+  const isTodayDate = activeDate === todayStr();
+  const inWindow = (() => {
+    if (!isTodayDate) return false;
+    const s = state.dayStart, e = state.dayEnd;
+    if (e >= s) return nowH >= s && nowH < e;
+    return nowH >= s || nowH < e;
+  })();
+  const activeIdx = (() => {
+    if (!inWindow || !state.tasks.length) return -1;
+    let cursor = state.dayStart;
+    for (let i = 0; i < state.tasks.length; i++) {
+      const next = cursor + (state.tasks[i].hours || 0);
+      const within = state.dayEnd >= state.dayStart
+        ? (nowH >= cursor && nowH < next)
+        : (((nowH - cursor + 24) % 24) < (state.tasks[i].hours || 0));
+      if (within) return i;
+      cursor = next;
+    }
+    return -1;
+  })();
+  const activeProgress = (() => {
+    if (activeIdx < 0) return 0;
+    let cursor = state.dayStart;
+    for (let i = 0; i < activeIdx; i++) cursor += state.tasks[i].hours || 0;
+    const len = state.tasks[activeIdx].hours || 0;
+    if (len <= 0) return 0;
+    const into = state.dayEnd >= state.dayStart ? (nowH - cursor) : (((nowH - cursor + 24) % 24));
+    return Math.max(0, Math.min(1, into / len));
+  })();
+
+  const showToast = (msg, type="ok") => { setToast({msg, type}); setTimeout(()=>setToast(null), TOAST_MS); };
 
   const switchDate = (ds) => {
     saveDateState(activeDateRef.current, state);
     const loaded = loadDateState(ds);
-    const next = loaded
-      ? { ...loaded, favs:state.favs, step:state.step, dark:state.dark }
-      : blankDayState(state);
-    dispatch({ type:"FULL_REPLACE", data:next });
-    setActiveDate(ds);
-    setActiveView("today");
-    setNewName("");
-    setEditTask(null);
+    const next = loaded ? {...loaded, favs:state.favs, step:state.step, dark:state.dark} : blankDayState(state);
+    dispatch({type:"FULL_REPLACE", data:next});
+    setActiveDate(ds); setActiveView("today");
+    setNewName(""); setEditTask(null); setSelectedTaskId(null);
   };
-
   const goToToday = () => switchDate(todayStr());
 
-  const scheduleTask = (task, targetDate) => {
-    // Save task into target date's stored state
-    const targetLoaded = loadDateState(targetDate);
+  const scheduleTask = (task, target) => {
+    const targetLoaded = loadDateState(target);
     const targetS = targetLoaded ? {...targetLoaded} : blankDayState(state);
-    const newTask = { ...task, id: Date.now() };
-    targetS.tasks = [...(targetS.tasks||[]), newTask];
-    saveDateState(targetDate, targetS);
-    dispatch({ type: "DEL_TASK", id: task.id });
+    targetS.tasks = [...(targetS.tasks||[]), {...task, id:Date.now()}];
+    saveDateState(target, targetS);
+    dispatch({type:"DEL_TASK", id:task.id});
     setEditTask(null);
-    showToast(`📅 → ${formatDateShort(targetDate)}`);
+    showToast(`Moved to ${formatDateShort(target)}`);
   };
 
-  useEffect(()=>{
-    document.documentElement.style.setProperty("--bg-slider",T.bgSlider);
-    document.body.style.background=T.bg;
-    document.getElementById("themeColorMeta").content=T.tc;
-  },[dark]);
-
-  const showToast=(msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),TOAST_MS); };
-  const setConfirmRmWithTimer=name=>{ clearTimeout(confirmRmTimer.current); setConfirmRm(name); if(name!==null)confirmRmTimer.current=setTimeout(()=>setConfirmRm(null),CONFIRM_MS); };
-
-  const addTask=(nameArg,colorArg,hoursArg)=>{
-    const name=(nameArg||newName).trim(); if(!name)return;
-    if(tasks.some(t=>nameLc(t.name)===nameLc(name))){showToast("Task already exists","err");return;}
-    dispatch({type:"ADD_TASK",name,color:colorArg,hours:hoursArg});
+  const addTask = (nameArg, colorArg, hoursArg) => {
+    const name = (nameArg||newName).trim(); if (!name) return;
+    if (tasks.some(t=>nameLc(t.name)===nameLc(name))) { showToast("Task already exists", "err"); return; }
+    dispatch({type:"ADD_TASK", name, color:colorArg, hours:hoursArg});
     recordUsage(name);
-    setConfirmRmWithTimer(null); setNewName(""); inputRef.current?.blur();
+    setNewName(""); inputRef.current?.blur();
   };
 
-  const startLongDrag=(i,e)=>{
-    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+  const startLongDrag = (i, e) => {
+    const cx = e.clientX, cy = e.clientY;
     clearTimeout(lpTimer.current);
-    lpTimer.current=setTimeout(()=>{ try{if(navigator.vibrate)navigator.vibrate([12,40,12])}catch{} setLongDragIdx(i);setDragPos({x:cx,y:cy}); },LONG_PRESS_MS);
+    lpTimer.current = setTimeout(() => {
+      try { if (navigator.vibrate) navigator.vibrate([10,30,10]); } catch {}
+      setLongDragIdx(i); setDragPos({x:cx, y:cy});
+    }, LONG_PRESS_MS);
   };
-  const cancelLongPress=()=>clearTimeout(lpTimer.current);
+  const cancelLongPress = () => clearTimeout(lpTimer.current);
 
-  useEffect(()=>{
-    if(longDragIdx===null)return;
-    document.body.style.overflow="hidden"; document.body.style.touchAction="none";
-    const onMove=e=>{ if(e.cancelable)e.preventDefault(); const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY; setDragPos({x:cx,y:cy}); const els=taskListRef.current?.querySelectorAll("[data-taskcard]"); if(!els)return; let found=null; for(let i=0;i<els.length;i++){const r=els[i].getBoundingClientRect();if(cy>=r.top&&cy<=r.bottom){found=i;break;}} setDragOver(found!==null&&found!==longDragIdx?found:null); };
-    const onUp=()=>{ if(dragOver!==null&&longDragIdx!==null&&dragOver!==longDragIdx)dispatch({type:"REORDER_TASKS",from:longDragIdx,to:dragOver}); setLongDragIdx(null);setDragOver(null); };
-    window.addEventListener("pointermove",onMove,{passive:false}); window.addEventListener("pointerup",onUp);
-    window.addEventListener("touchmove",onMove,{passive:false});   window.addEventListener("touchend",onUp);
-    return ()=>{ document.body.style.overflow=""; document.body.style.touchAction=""; window.removeEventListener("pointermove",onMove); window.removeEventListener("pointerup",onUp); window.removeEventListener("touchmove",onMove); window.removeEventListener("touchend",onUp); };
-  },[longDragIdx,dragOver]);
+  useEffect(() => {
+    if (longDragIdx === null) return;
+    document.body.style.overflow = "hidden";
+    const onMove = e => {
+      if (e.cancelable) e.preventDefault();
+      const cx = e.clientX, cy = e.clientY;
+      setDragPos({x:cx, y:cy});
+      const els = taskListRef.current?.querySelectorAll("[data-taskcard]"); if (!els) return;
+      let found = null;
+      for (let i=0;i<els.length;i++) {
+        const r = els[i].getBoundingClientRect();
+        if (cy>=r.top && cy<=r.bottom) { found=i; break; }
+      }
+      setDragOver(found!==null && found!==longDragIdx ? found : null);
+    };
+    const onUp = () => {
+      if (dragOver!==null && longDragIdx!==null && dragOver!==longDragIdx) dispatch({type:"REORDER_TASKS", from:longDragIdx, to:dragOver});
+      setLongDragIdx(null); setDragOver(null);
+    };
+    window.addEventListener("pointermove", onMove, {passive:false});
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [longDragIdx, dragOver]);
 
-  const exportMD=()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([serializeMD(tasks,dayStart,dayEnd)],{type:"text/markdown"})); a.download="sliders.md"; a.click(); showToast("Exported ✓"); };
-  const handleFile=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{const{tasks:p,dayStart:ds,dayEnd:de}=parseMD(ev.target.result); if(!p.length){showToast("No tasks found","err");return;} dispatch({type:"SET_TASKS",tasks:p}); if(ds!==null&&de!==null&&de>ds)dispatch({type:"SET_DAY_WINDOW",start:ds,end:de}); showToast(`${p.length} tasks loaded`);}; r.readAsText(f); e.target.value=""; };
-
+  const exportMD = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([serializeMD(tasks, dayStart, dayEnd)], {type:"text/markdown"}));
+    a.download = "sliders.md"; a.click();
+    showToast("Exported");
+  };
+  const handleFile = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const { tasks:p, dayStart:ds, dayEnd:de } = parseMD(ev.target.result);
+      if (!p.length) { showToast("No tasks found", "err"); return; }
+      dispatch({type:"SET_TASKS", tasks:p});
+      if (ds!==null && de!==null && de>ds) dispatch({type:"SET_DAY_WINDOW", start:ds, end:de});
+      showToast(`${p.length} tasks loaded`);
+    };
+    r.readAsText(f); e.target.value = "";
+  };
   const handleSyncImport = (data, mode) => {
-    if (mode === "full") {
-      dispatch({ type:"FULL_REPLACE", data });
-      showToast("Full replace done ✓");
-    } else {
-      dispatch({ type:"MERGE_IMPORT", data });
-      showToast("New items added ✓");
-    }
+    if (mode==="full") { dispatch({type:"FULL_REPLACE", data}); showToast("Replaced"); }
+    else { dispatch({type:"MERGE_IMPORT", data}); showToast("Merged"); }
   };
 
-  const collapsibleBtn=(label,open,onClick,extra={})=>(
-    <button onClick={onClick} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"9px 14px",color:T.textMuted,fontFamily:MONO,fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",...extra}}>
-      <span>{label}</span><span style={{fontSize:11}}>{open?"▲":"▼"}</span>
-    </button>
-  );
+  const isToday = isTodayDate;
+  const dayLabel = isToday ? "Today" : formatDateLabel(activeDate);
+  const headerTotal = perfect ? formatHours(dl) : formatHours(Math.abs(remaining));
 
   return (
-    <div className="main-wrap" style={{minHeight:"100dvh",background:T.bg,color:T.text,fontFamily:MONO,maxWidth:520,margin:"0 auto",paddingBottom:100,transition:"background 0.25s,color 0.25s"}}>
-
-      {/* HEADER */}
-      <div className="sticky-header" style={{background:T.bg,transition:"background 0.25s"}}>
-        <div style={{padding:"14px 16px 12px",borderBottom:`1px solid ${T.border}`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{display:"flex",alignItems:"baseline",gap:8}}>
-              <h1 style={{fontFamily:BEBAS,fontSize:36,letterSpacing:3,color:"#FF6B2B",lineHeight:1}}>SLIDERS</h1>
-              <span style={{fontFamily:MONO,fontSize:8,color:T.textFaint,background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:4,padding:"2px 5px",letterSpacing:1}}>{step}m</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-              <div style={{textAlign:"left",width:96,flexShrink:0}}>
-                <div style={{fontSize:26,fontFamily:BEBAS,letterSpacing:1,lineHeight:1,color:over?"#ff4444":perfect?"#4ECDC4":T.textSub,whiteSpace:"nowrap"}}>{perfect?`${formatHours(dl)} ✓`:formatHours(Math.abs(remaining))}</div>
-                <div style={{fontSize:8,color:over?"#ff4444":T.textFaint,letterSpacing:1}}>{over?"OVER BY":perfect?"ALLOCATED":"REMAINING"}</div>
+    <div className="app">
+      {/* Header */}
+      <div style={{position:"sticky", top:0, zIndex:20, background:"var(--bg)", borderBottom:"1px solid var(--border)"}}>
+        <div style={{padding:"16px 20px 12px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12}}>
+          <div style={{display:"flex", alignItems:"center", gap:10}}>
+            <div style={{width:8, height:24, borderRadius:2, background:"linear-gradient(180deg, var(--accent-2), var(--accent), var(--accent-3))"}}/>
+            <div>
+              <div style={{fontSize:18, fontWeight:600, letterSpacing:"-0.02em", lineHeight:1}}>Sliders</div>
+              <div style={{fontSize:11, color:"var(--text-3)", marginTop:2, fontFamily:"var(--font-mono)", display:"flex", gap:8, alignItems:"center"}}>
+                <span className="tnum">{formatTime(nowH)}</span>
+                <span style={{opacity:0.4}}>·</span>
+                <span>{step}m</span>
               </div>
-              <button onClick={()=>dispatch({type:"SET_DARK",dark:!dark})} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:`1px solid ${T.border}`,borderRadius:20,padding:"6px 10px",minHeight:36,flexShrink:0,width:66}}>
-                <span style={{fontSize:13}}>{dark?"☀️":"🌙"}</span>
-                <div style={{width:28,height:16,borderRadius:8,background:dark?"#444":T.borderMid,position:"relative",transition:"background 0.2s",flexShrink:0}}>
-                  <div style={{position:"absolute",top:2,left:dark?12:2,width:12,height:12,borderRadius:"50%",background:"#FF6B2B",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.4)"}}/>
-                </div>
+            </div>
+          </div>
+          <div style={{display:"flex", alignItems:"center", gap:10}}>
+            <div style={{textAlign:"right"}}>
+              <div className="tnum" style={{fontSize:18, fontWeight:600, letterSpacing:"-0.01em", lineHeight:1, color: over?"var(--danger)":perfect?"var(--accent-2)":"var(--text)"}}>
+                {headerTotal}
+              </div>
+              <div style={{fontSize:10, fontFamily:"var(--font-mono)", color:"var(--text-3)", letterSpacing:"0.06em", marginTop:3}}>
+                {over?"OVER":perfect?"FULL":"FREE"}
+              </div>
+            </div>
+            <button onClick={()=>dispatch({type:"SET_DARK", dark:!dark})} aria-label="Toggle theme" className="btn btn-ghost btn-icon">
+              {dark
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              }
+            </button>
+            <button onClick={()=>setShowHelp(true)} aria-label="Keyboard shortcuts" title="Shortcuts (?)" className="btn btn-ghost btn-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{height:2, background:"var(--bg-track)", position:"relative", overflow:"hidden"}}>
+          <div style={{
+            position:"absolute", left:0, top:0, bottom:0,
+            width:`${Math.min(100,(total/dl)*100)}%`,
+            background: over?"var(--danger)":perfect?"var(--accent-2)":"var(--accent)",
+            transition:"width 0.3s, background 0.2s",
+          }}/>
+        </div>
+        {/* Tabs */}
+        <div className="tab-bar" style={{padding:"0 8px"}}>
+          {!isToday && (
+            <button onClick={goToToday} className="tab" style={{flex:"0 0 auto", padding:"0 14px"}}>Today</button>
+          )}
+          <button onClick={()=>setActiveView("today")} className={`tab ${activeView==="today"?"active":""}`}>
+            {dayLabel}
+          </button>
+          <button onClick={()=>setActiveView("week")} className={`tab ${activeView==="week"?"active":""}`}>
+            Week
+          </button>
+        </div>
+      </div>
+
+      {activeView === "today" ? (
+        <div className="desktop-grid" style={{padding:"16px 20px"}}>
+          <div className="col-left">
+          {/* Hero: Day Window + Donut */}
+          <div className="card" style={{padding:"20px", marginBottom:16, display:"flex", flexDirection:"column", alignItems:"center", gap:8}}>
+            <div style={{position:"relative", width:RING_SIZE, height:RING_SIZE}}>
+              <DayWindow dayStart={dayStart} dayEnd={dayEnd}
+                nowHour={isToday ? nowH : undefined}
+                onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW", start:s, end:e})}/>
+              <svg width={RING_SIZE} height={RING_SIZE}
+                style={{position:"absolute", top:0, left:0, pointerEvents:"none"}}>
+                <g style={{pointerEvents:"auto"}}>
+                  <Donut tasks={tasks} dayLen={dl} dayStart={dayStart}
+                    selectedId={selectedTaskId}
+                    onSelectTask={setSelectedTaskId}/>
+                </g>
+              </svg>
+            </div>
+            <div style={{display:"flex", alignItems:"center", gap:10, marginTop:6, flexWrap:"wrap", justifyContent:"center"}}>
+              <div className="kbd tnum">{formatTime(dayStart)} → {formatTime(dayEnd)}</div>
+              <div style={{fontSize:12, color:"var(--text-3)"}}>·</div>
+              <div className="tnum" style={{fontSize:13, color:"var(--text-2)"}}>{formatHours(dl)} day</div>
+              <button onClick={()=>{
+                const now=new Date(), m=now.getHours()*60+now.getMinutes();
+                const newStart = Math.min(Math.ceil(m/step)*step/60, 23.5);
+                dispatch({type:"SET_DAY_WINDOW", start:newStart, end:dayEnd});
+                showToast("Start = now");
+              }} className="btn btn-ghost" style={{minHeight:32, padding:"0 12px", fontSize:12}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Start now
               </button>
             </div>
           </div>
-        </div>
-        <div style={{height:2,background:T.bgSlider,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${Math.min(100,(total/dl)*100)}%`,background:over?"#ff4444":perfect?"#4ECDC4":"#FF6B2B",transition:"width 0.2s,background 0.2s",borderRadius:"0 2px 2px 0"}}/>
-        </div>
-        {/* Tab bar */}
-        {(()=>{
-          const isToday = activeDate === todayStr();
-          const dayLabel = isToday ? "⬡ TODAY" : formatDateLabel(activeDate).toUpperCase();
-          return (
-            <div style={{display:"flex",borderBottom:`1px solid ${T.border}`}}>
-              {!isToday && (
-                <button onClick={goToToday} style={{background:"none",border:"none",borderBottom:"2px solid transparent",padding:"9px 12px 7px",color:T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",transition:"color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.color="#FF6B2B"} onMouseLeave={e=>e.currentTarget.style.color=T.textFaint}>
-                  ⬡ TODAY
+
+          {showTL && tasks.length>0 && <Timeline tasks={tasks} dayLen={dl} dayStart={dayStart}/>}
+          </div>
+
+          <div className="col-right">
+          {/* Settings + Sync row */}
+          <div style={{display:"flex", gap:8, marginBottom:14}}>
+            <button onClick={()=>setShowSettings(v=>!v)} className="btn" style={{flex:1, justifyContent:"space-between", borderColor: showSettings?"var(--accent)":"var(--border)", color: showSettings?"var(--accent)":"var(--text-2)"}}>
+              <span style={{display:"flex", alignItems:"center", gap:8}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+              </span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform:showSettings?"rotate(180deg)":"none", transition:"transform 0.2s"}}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button onClick={()=>setShowSync(true)} className="btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Sync
+            </button>
+          </div>
+
+          {showSettings && (
+            <Settings
+              step={step} showTL={showTL} dayStart={dayStart} dayEnd={dayEnd} dark={dark}
+              dispatch={dispatch}
+              onExport={exportMD}
+              onImportFile={()=>fileRef.current.click()}
+              onSync={()=>setShowSync(true)}
+              onReset={()=>{ localStorage.removeItem(STORAGE_KEY); window.location.reload(); }}/>
+          )}
+          <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
+
+          {/* Favourites */}
+          {(favs.length>0 || showFavs) && (
+            <div style={{marginBottom:14}}>
+              <button onClick={()=>setShowFavs(v=>!v)} className="btn" style={{width:"100%", justifyContent:"space-between"}}>
+                <span style={{display:"flex", alignItems:"center", gap:8}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Favourites <span style={{color:"var(--text-3)", fontWeight:400}}>({favs.length})</span>
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform:showFavs?"rotate(180deg)":"none", transition:"transform 0.2s"}}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {showFavs && (
+                <div className="card" style={{padding:"12px", marginTop:8, animation:"fadeUp 0.15s"}}>
+                  {favs.length===0 ? (
+                    <div style={{textAlign:"center", padding:"20px 0", fontSize:13, color:"var(--text-3)"}}>
+                      Star a task to save it as a favourite
+                    </div>
+                  ) : (
+                    <div style={{display:"flex", flexWrap:"wrap", gap:8}}>
+                      {favs.map(f => {
+                        const active = tasks.some(t=>nameLc(t.name)===nameLc(f.name));
+                        const pending = confirmRm===f.name;
+                        return (
+                          <div key={f.name} style={{display:"flex", alignItems:"center", borderRadius:10, overflow:"hidden", border:`1px solid ${pending?"var(--danger)":active?f.color:"var(--border)"}`, opacity:active?0.5:1, transition:"all 0.15s"}}>
+                            <button onClick={()=>{ if (pending) { setConfirmRm(null); return; } if (!active) addTask(f.name, f.color, f.hours); }}
+                              style={{
+                                background: pending?"color-mix(in oklab, var(--danger) 15%, transparent)":active?"transparent":`color-mix(in oklab, ${f.color} 12%, transparent)`,
+                                border:"none", padding:"8px 12px", display:"flex", alignItems:"center", gap:8,
+                                minHeight:40, cursor:active&&!pending?"default":"pointer",
+                              }}>
+                              <div style={{width:8, height:8, borderRadius:"50%", background:pending?"var(--danger)":f.color}}/>
+                              <span style={{fontSize:13, color:active?"var(--text-3)":"var(--text)"}}>{pending?"Tap × to confirm":(f.name.length>16?f.name.slice(0,16)+"…":f.name)}</span>
+                              {!pending && <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:f.color, fontWeight:500}} className="tnum">{formatHours(f.hours)}</span>}
+                            </button>
+                            <button onClick={()=>{
+                              if (pending) { dispatch({type:"DEL_FAV", name:f.name}); setConfirmRm(null); }
+                              else { setConfirmRm(f.name); clearTimeout(confirmTimer.current); confirmTimer.current = setTimeout(()=>setConfirmRm(null), CONFIRM_MS); }
+                            }} aria-label="Remove favourite" style={{
+                              background:pending?"color-mix(in oklab, var(--danger) 15%, transparent)":"transparent",
+                              border:"none", borderLeft:`1px solid ${pending?"var(--danger)":"var(--border)"}`,
+                              padding:"0 12px", color:pending?"var(--danger)":"var(--text-4)", minHeight:40, cursor:"pointer",
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tasks */}
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+              <div className="label">Tasks</div>
+              {tasks.length>1 && (
+                <button onClick={()=>{dispatch({type:"DISTRIBUTE"}); showToast("Distributed evenly");}}
+                  className="btn btn-ghost" style={{minHeight:32, padding:"0 12px", fontSize:12, color:"var(--text-3)"}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                  Distribute evenly
                 </button>
               )}
-              <button onClick={()=>setActiveView("today")} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView==="today"?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView==="today"?"#FF6B2B":isToday?T.textFaint:"#4ECDC4",fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {dayLabel}
-              </button>
-              <button onClick={()=>setActiveView("week")} style={{flex:1,background:"none",border:"none",borderBottom:`2px solid ${activeView==="week"?"#FF6B2B":"transparent"}`,padding:"9px 0 7px",color:activeView==="week"?"#FF6B2B":T.textFaint,fontFamily:MONO,fontSize:10,letterSpacing:1.5,cursor:"pointer",transition:"color 0.15s,border-color 0.15s"}}>
-                ▦ WEEK
-              </button>
             </div>
-          );
-        })()}
-      </div>
 
-      <div style={{padding:"0 16px"}}>
+            {tasks.length===0 && (
+              <div style={{textAlign:"center", padding:"40px 20px", borderRadius:14, border:"1px dashed var(--border)"}}>
+                <div style={{fontSize:14, color:"var(--text-2)", marginBottom:6, fontWeight:500}}>No tasks yet</div>
+                <div style={{fontSize:13, color:"var(--text-3)"}}>Add one below to start sliding</div>
+              </div>
+            )}
 
-        {activeView==="week" ? null : (<React.Fragment>
-
-        {/* DONUT + RING */}
-        <div style={{margin:"12px 0",padding:"16px 16px 12px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{position:"relative",width:220,height:220,flexShrink:0,margin:"14px 16px"}}>
-              <CircularDaySlider dayStart={dayStart} dayEnd={dayEnd} T={T} onChange={(s,e)=>dispatch({type:"SET_DAY_WINDOW",start:s,end:e})}/>
-              <Donut tasks={tasks} T={T} dayLen={dl} dayStart={dayStart} onReorder={(f,t)=>dispatch({type:"REORDER_TASKS",from:f,to:t})}/>
-            </div>
-            <div style={{flex:1,overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:0}}>
-              {tasks.map((t,i)=>{
-                const pct=dl>0?Math.max(2,(t.hours/dl)*100):0, c=t.done?"#555":t.color;
-                const {start:tStart,end:tEnd}=taskTimeRange(tasks,i,dayStart);
+            <div ref={taskListRef} style={{opacity:longDragIdx!==null?0.92:1, transition:"opacity 0.2s"}}>
+              {tasks.map((t, i) => {
+                const tStart = (() => { let c = dayStart; for (let j=0;j<i;j++) c+=tasks[j].hours||0; return c; })();
+                const isFloat = longDragIdx === i;
+                const isOver = dragOver === i;
                 return (
-                  <div key={t.id} style={{marginBottom:7,opacity:t.done?.4:1,transition:"opacity 0.2s"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:1}}>
-                      <span style={{fontSize:10,color:t.done?T.textFaint:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:t.done?"line-through":"none",maxWidth:"100%",fontFamily:MONO}}>{t.name}</span>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                      <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tStart)}</span>
-                      <span style={{fontSize:9,color:c,fontFamily:MONO,opacity:0.85}}>{formatTime(tEnd)}</span>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
-                      <div style={{flex:1,height:4,borderRadius:3,background:T.bgSlider,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${pct}%`,borderRadius:3,background:c,boxShadow:t.done?"none":`0 0 6px ${c}66`,transition:"width 0.3s"}}/>
-                      </div>
-                      <span style={{fontFamily:MONO,fontSize:9,color:adjustColor(c,0,-20),flexShrink:0,minWidth:28,textAlign:"right"}}>{formatHours(t.hours)}</span>
-                    </div>
+                  <div key={t.id} data-taskcard={i} style={{
+                    opacity: isFloat ? 0.25 : 1,
+                    transform: isOver ? "translateY(-3px)" : isFloat ? "scale(0.98)" : "none",
+                    transition: "all 0.15s",
+                  }}>
+                    <TaskCard task={t} taskStart={tStart} stepMinutes={step} dayLen={dl}
+                      isActive={isToday && activeIdx===i}
+                      progress={isToday && activeIdx===i ? activeProgress : undefined}
+                      onChange={p=>dispatch({type:"UPD_TASK", id:t.id, patch:p})}
+                      onDelete={()=>dispatch({type:"DEL_TASK", id:t.id})}
+                      onEdit={()=>setEditTask({...t})}
+                      onLock={()=>dispatch({type:"UPD_TASK", id:t.id, patch:{locked:!t.locked}})}
+                      isFav={favs.some(f=>nameLc(f.name)===nameLc(t.name))}
+                      onFav={()=>dispatch({type:favs.some(f=>nameLc(f.name)===nameLc(t.name))?"DEL_FAV":"ADD_FAV", name:t.name, task:t})}
+                      onLongPressStart={e=>startLongDrag(i,e)}
+                      onLongPressEnd={cancelLongPress}/>
                   </div>
                 );
               })}
-              {tasks.length===0&&<span style={{fontSize:10,color:T.textFaint}}>No tasks yet</span>}
-              <button onClick={()=>{ const now=new Date(), m=now.getHours()*60+now.getMinutes(); dispatch({type:"SET_DAY_START",start:Math.min(Math.ceil(m/step)*step/60,23.5)}); showToast("Start → now ✓"); }}
-                style={{marginTop:6,background:"none",border:`1px solid ${T.borderMid}`,borderRadius:8,padding:"7px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",display:"flex",alignItems:"center",gap:5,transition:"all 0.15s",letterSpacing:0.5}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
-                onTouchStart={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}}
-                onTouchEnd={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}
-              ><span>⏱</span> start now</button>
             </div>
           </div>
-        </div>
 
-        {showTL&&<Timeline tasks={tasks} T={T} dayLen={dl} dayStart={dayStart}/>}
-
-        {/* SETTINGS + SYNC row */}
-        <div style={{marginBottom:10}}>
-          <div style={{display:"flex",gap:6,marginBottom:6}}>
-            <button onClick={()=>setShowSettings(v=>!v)} style={{flex:1,background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"9px 14px",color:showSettings?"#FF6B2B":T.textMuted,fontFamily:MONO,fontSize:10,letterSpacing:1,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",transition:"color 0.15s,border-color 0.15s",borderColor:showSettings?"#FF6B2B":T.border}}>
-              <span>⚙ SETTINGS</span><span style={{fontSize:11}}>{showSettings?"▲":"▼"}</span>
-            </button>
-            <button onClick={()=>setShowSync(true)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:10,padding:"9px 14px",color:T.textMuted,fontFamily:MONO,fontSize:10,letterSpacing:1,display:"flex",alignItems:"center",gap:6,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#FF6B2B";e.currentTarget.style.color="#FF6B2B";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.textMuted;}}>
-              🔗 SYNC
-            </button>
-          </div>
-          {showSettings&&(
-            <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 16px",animation:"slideIn 0.15s ease"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
-                <span style={{fontFamily:MONO,fontSize:11,color:T.textSub}}>Timeline view</span>
-                <button onClick={()=>dispatch({type:"SET_SHOW_TL",v:!showTL})} style={{width:44,height:24,borderRadius:12,background:showTL?"#FF6B2B":"#484850",border:"none",position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                  <div style={{position:"absolute",top:3,left:showTL?22:3,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}/>
-                </button>
-              </div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>SNAP SIZE</div>
-                <div style={{display:"flex",gap:6}}>
-                  {STEPS.map(s=><button key={s.m} onClick={()=>dispatch({type:"SET_STEP",step:s.m})} style={{flex:1,background:s.m===step?"#FF6B2B":T.bgInput,border:`1px solid ${s.m===step?"#FF6B2B":T.border}`,borderRadius:8,padding:"8px 0",color:s.m===step?"#000":T.textMuted,fontFamily:MONO,fontSize:11,fontWeight:s.m===step?"bold":"normal",transition:"all 0.15s"}}>{s.l}</button>)}
+          {longDragIdx!==null && tasks[longDragIdx] && (() => {
+            const t = tasks[longDragIdx];
+            return (
+              <div style={{
+                position:"fixed", left:dragPos.x-140, top:dragPos.y-28,
+                width:280, zIndex:300, pointerEvents:"none",
+                filter:`drop-shadow(0 12px 32px ${t.color}66)`,
+              }}>
+                <div className="card" style={{
+                  padding:"12px 16px", display:"flex", alignItems:"center", gap:10,
+                  borderColor:t.color, transform:"rotate(-1deg) scale(1.04)",
+                }}>
+                  <div style={{width:10, height:10, borderRadius:"50%", background:t.color}}/>
+                  <span style={{fontSize:14, color:"var(--text)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{t.name}</span>
+                  <span className="tnum" style={{fontFamily:"var(--font-mono)", fontSize:12, color:t.color, fontWeight:600}}>{formatHours(t.hours)}</span>
                 </div>
               </div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>FILE</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {[["⬇ EXPORT .MD",exportMD],["⬆ IMPORT .MD",()=>fileRef.current.click()]].map(([label,onClick])=>(
-                    <button key={label} onClick={onClick} style={{background:dark?"#0e0e10":"#d0cec8",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:10,padding:"12px 10px",minHeight:48,color:dark?"#cccccc":"#2a2a2a",fontFamily:MONO,fontSize:10,letterSpacing:0.5,width:"100%",transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.7"} onTouchEnd={e=>e.currentTarget.style.opacity="1"}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
-              <div>
-                <div style={{fontSize:9,color:T.textDim,letterSpacing:1.5,marginBottom:8,fontFamily:MONO}}>DANGER</div>
-                {!confirmReset?(
-                  <button onClick={()=>setConfirmReset(true)} style={{width:"100%",background:"none",border:"1px solid #cc3333",borderRadius:10,padding:"10px",color:"#cc3333",fontFamily:MONO,fontSize:10,letterSpacing:1,cursor:"pointer"}}>⚠ RESET APP</button>
-                ):(
-                  <div style={{background:"#1a0000",border:"1px solid #ff2222",borderRadius:10,padding:"14px",animation:"slideIn 0.15s ease"}}>
-                    <div style={{fontFamily:MONO,fontSize:11,color:"#ff4444",marginBottom:12,lineHeight:1.6}}>Reset everything?<br/><span style={{fontSize:9,color:"#cc4444",opacity:0.8}}>Tasks, favourites and settings will be wiped.</span></div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>{localStorage.removeItem(STORAGE_KEY);window.location.reload();}} style={{flex:1,background:"#cc0000",border:"none",borderRadius:8,padding:"10px",color:"#fff",fontFamily:MONO,fontSize:11,fontWeight:"bold",minHeight:44}}>YES</button>
-                      <button onClick={()=>setConfirmReset(false)} style={{flex:1,background:"none",border:`1px solid ${dark?"#505055":"#a8a6a0"}`,borderRadius:8,padding:"10px",color:T.textMuted,fontFamily:MONO,fontSize:11,minHeight:44}}>CANCEL</button>
-                    </div>
+            );
+          })()}
+
+          {/* Add task */}
+          {(() => {
+            const topUsed = getTopUsed(3).filter(name => !tasks.some(t=>nameLc(t.name)===name));
+            return (
+              <div style={{position:"relative", display:"flex", gap:8, marginBottom:24}}>
+                {inputFocused && topUsed.length>0 && (
+                  <div style={{
+                    position:"absolute", bottom:"calc(100% + 8px)", left:0, right:0,
+                    zIndex:50, display:"flex", gap:6, padding:"8px",
+                    background:"var(--bg-elev)", border:"1px solid var(--border)",
+                    borderRadius:12, boxShadow:"0 -8px 24px rgba(0,0,0,0.4)",
+                    animation:"fadeUp 0.15s",
+                  }}>
+                    {topUsed.map(name => {
+                      const fav = favs.find(f=>nameLc(f.name)===name);
+                      const c = fav?.color || PALETTE[0];
+                      return (
+                        <button key={name} onMouseDown={e=>{e.preventDefault(); addTask(name, fav?.color, fav?.hours);}}
+                          style={{
+                            flex:1, background:`color-mix(in oklab, ${c} 12%, transparent)`,
+                            border:`1px solid color-mix(in oklab, ${c} 30%, transparent)`,
+                            borderRadius:8, padding:"8px 10px", display:"flex", alignItems:"center", gap:6,
+                            cursor:"pointer", minWidth:0, overflow:"hidden",
+                          }}>
+                          <div style={{width:7, height:7, borderRadius:"50%", background:c, flexShrink:0}}/>
+                          <span style={{fontSize:12, color:"var(--text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{name.length>12?name.slice(0,12)+"…":name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
+                <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addTask()}
+                  placeholder="Add a task…" className="input"
+                  style={{flex:1, minHeight:52, fontSize:15}}
+                  onFocus={()=>setInputFocused(true)}
+                  onBlur={()=>setTimeout(()=>setInputFocused(false), 150)}/>
+                <button onClick={()=>addTask()} className="btn btn-primary" style={{minHeight:52, minWidth:80, fontSize:15}}>Add</button>
               </div>
-            </div>
-          )}
-        </div>
-        <div style={{textAlign:"center",padding:"2px 0 10px"}}>
-          <a href="./privacy.html" target="_blank" rel="noopener noreferrer" style={{fontFamily:MONO,fontSize:9,color:T.textFaint,letterSpacing:1,textDecoration:"none",borderBottom:"1px solid #333",paddingBottom:1}} onMouseEnter={e=>e.currentTarget.style.color="#4ECDC4"} onMouseLeave={e=>e.currentTarget.style.color=T.textFaint}>PRIVACY POLICY ↗</a>
-        </div>
-
-        {/* FAVOURITES */}
-        <div style={{marginBottom:12}}>
-          {collapsibleBtn(`★ FAVOURITES${favs.length>0?` (${favs.length})`:""}`,showFavs,()=>setShowFavs(v=>!v),{marginBottom:showFavs?8:0,transition:"margin 0.15s"})}
-          {showFavs&&(
-            <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 12px",animation:"slideIn 0.15s ease"}}>
-              {favs.length===0&&<div style={{textAlign:"center",padding:"16px 0",fontFamily:MONO,fontSize:11,color:T.textFaint,letterSpacing:1}}>NO FAVOURITES YET — STAR A TASK</div>}
-              <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                {favs.map(f=>{
-                  const active=tasks.some(t=>nameLc(t.name)===nameLc(f.name)), pending=confirmRm===f.name;
-                  const dn=pending?"tap to cancel":(f.name.length>14?f.name.slice(0,14)+"…":f.name);
-                  return (
-                    <div key={f.name} style={{display:"flex",alignItems:"center",borderRadius:10,overflow:"hidden",border:`1px solid ${pending?"#ff5555":active?f.color:T.border}`,opacity:active?.45:1,transition:"all 0.15s"}}>
-                      <button onClick={()=>{if(pending){setConfirmRmWithTimer(null);return;}if(!active)addTask(f.name,f.color,f.hours);}} style={{background:pending?"#3a0a0a":active?T.bgCard:`${f.color}22`,border:"none",padding:"8px 12px",display:"flex",alignItems:"center",gap:7,cursor:active&&!pending?"default":"pointer",minHeight:40}}>
-                        <div style={{width:8,height:8,borderRadius:"50%",background:pending?"#ff5555":f.color,flexShrink:0}}/>
-                        <span style={{fontFamily:MONO,fontSize:11,color:pending?"#ff7777":active?T.textFaint:T.text,whiteSpace:"nowrap"}}>{dn}</span>
-                        {!pending&&<span style={{fontFamily:MONO,fontSize:10,color:f.color,opacity:0.8}}>{formatHours(f.hours)}</span>}
-                      </button>
-                      <button onClick={()=>pending?(dispatch({type:"DEL_FAV",name:f.name}),setConfirmRmWithTimer(null)):setConfirmRmWithTimer(f.name)} style={{background:pending?"#ff444430":"none",border:"none",borderLeft:`1px solid ${pending?"#ff5555":T.border}`,padding:"8px 10px",color:pending?"#ff5555":T.textDim,fontSize:11,cursor:"pointer",minHeight:40,display:"flex",alignItems:"center",fontFamily:MONO,transition:"all 0.15s"}} onMouseEnter={e=>{if(!pending)e.currentTarget.style.color="#ff5555";}} onMouseLeave={e=>{if(!pending)e.currentTarget.style.color=T.textDim;}}>{pending?"remove":"✕"}</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* TASKS */}
-        <div style={{marginBottom:12}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <div style={{fontSize:10,color:T.textDim,letterSpacing:2,fontFamily:MONO}}>TASKS</div>
-            {tasks.length>1&&<button onClick={()=>{dispatch({type:"DISTRIBUTE"});showToast("Distributed ✓");}} style={{background:"none",border:`1px solid ${T.borderMid}`,borderRadius:7,padding:"4px 10px",color:T.textMuted,fontFamily:MONO,fontSize:9,cursor:"pointer",letterSpacing:0.5,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#4ECDC4";e.currentTarget.style.color="#4ECDC4";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.textMuted;}}>⇄ distribute</button>}
-          </div>
-          {tasks.length===0&&(
-            <div style={{textAlign:"center",padding:"28px 0 20px",borderRadius:12,border:`1px dashed ${T.border}`}}>
-              <div style={{fontSize:24,marginBottom:8}}>📋</div>
-              <div style={{fontSize:11,color:T.textFaint,letterSpacing:1}}>No tasks yet</div>
-              <div style={{fontSize:10,color:T.textFaint,opacity:0.6,marginTop:4}}>Add one below ↓</div>
-            </div>
-          )}
-          <div ref={taskListRef} style={{opacity:longDragIdx!==null?.92:1,transition:"opacity 0.2s"}}>
-            {tasks.map((t,i)=>{
-              const tStart=(()=>{let c=dayStart;for(let j=0;j<i;j++)c+=tasks[j].hours||0;return c;})();
-              const isFloat=longDragIdx===i, isOver=dragOver===i;
-              return (
-                <div key={t.id} data-taskcard={i} style={{opacity:isFloat?.25:1,transform:isOver?"translateY(-3px) scale(1.01)":isFloat?"scale(0.97)":"none",transition:"opacity 0.2s,transform 0.15s",filter:isOver?`drop-shadow(0 4px 12px ${t.color}55)`:"none",borderRadius:12}}>
-                  <TaskCard task={t} taskStart={tStart} stepMinutes={step} dayLen={dl} tasks={tasks} T={T}
-                    onChange={p=>dispatch({type:"UPD_TASK",id:t.id,patch:p})}
-                    onDelete={()=>dispatch({type:"DEL_TASK",id:t.id})}
-                    onEdit={()=>setEditTask({...t})}
-                    onLock={()=>dispatch({type:"UPD_TASK",id:t.id,patch:{locked:!t.locked}})}
-                    isFav={favs.some(f=>nameLc(f.name)===nameLc(t.name))}
-                    onFav={()=>dispatch({type:favs.some(f=>nameLc(f.name)===nameLc(t.name))?"DEL_FAV":"ADD_FAV",name:t.name,task:t})}
-                    onLongPressStart={e=>startLongDrag(i,e)} onLongPressEnd={cancelLongPress}
-                  />
-                </div>
-              );
-            })}
+            );
+          })()}
           </div>
         </div>
-
-        {longDragIdx!==null&&tasks[longDragIdx]&&(()=>{const t=tasks[longDragIdx];return(
-          <div style={{position:"fixed",left:dragPos.x-140,top:dragPos.y-28,width:280,zIndex:300,pointerEvents:"none",animation:"floatIn 0.15s ease",filter:`drop-shadow(0 8px 24px ${t.color}66)`}}>
-            <div style={{background:T.bgCard,border:`2px solid ${t.color}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,transform:"rotate(-1.5deg) scale(1.04)"}}>
-              <div style={{width:12,height:12,borderRadius:"50%",background:t.color,boxShadow:`0 0 8px ${t.color}`}}/>
-              <span style={{fontFamily:MONO,fontSize:12,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
-              <span style={{fontFamily:MONO,fontSize:11,color:t.color,fontWeight:"bold"}}>{formatHours(t.hours)}</span>
-            </div>
-          </div>
-        );})()}
-
-        {/* ADD TASK */}
-        {(()=>{
-          const topUsed = getTopUsed(3);
-          const suggestions = topUsed.filter(name => !tasks.some(t=>nameLc(t.name)===name));
-          return (
-            <div style={{position:"relative",display:"flex",gap:8,marginBottom:24}}>
-              {inputFocused && suggestions.length > 0 && (
-                <div style={{position:"absolute",bottom:"calc(100% + 8px)",left:0,right:0,zIndex:50,display:"flex",gap:6,padding:"8px 10px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:`0 -4px 20px rgba(0,0,0,0.35)`,animation:"slideIn 0.15s ease",pointerEvents:"auto"}}>
-                  {suggestions.map(name=>{
-                    const fav=favs.find(f=>nameLc(f.name)===name);
-                    const color=fav?.color||PALETTE[0];
-                    return (
-                      <button key={name} onMouseDown={e=>{e.preventDefault(); addTask(name,fav?.color,fav?.hours);}} style={{flex:1,background:`${color}18`,border:`1px solid ${color}44`,borderRadius:8,padding:"7px 8px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",transition:"all 0.15s",minWidth:0,overflow:"hidden"}} onMouseEnter={e=>{e.currentTarget.style.background=`${color}30`;e.currentTarget.style.borderColor=`${color}88`;}} onMouseLeave={e=>{e.currentTarget.style.background=`${color}18`;e.currentTarget.style.borderColor=`${color}44`;}}>
-                        <div style={{width:7,height:7,borderRadius:"50%",background:color,flexShrink:0}}/>
-                        <span style={{fontFamily:MONO,fontSize:10,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name.length>12?name.slice(0,12)+"…":name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <input ref={inputRef} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="Add a task…" style={{flex:1,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:10,padding:"13px 16px",color:T.text,fontFamily:MONO,fontSize:14,transition:"border-color 0.2s"}} onFocus={e=>{e.target.style.borderColor="#FF6B2B";setInputFocused(true);}} onBlur={e=>{e.target.style.borderColor=T.border;setTimeout(()=>setInputFocused(false),150);}}/>
-              <button onClick={()=>addTask()} style={{background:"#FF6B2B",border:"none",borderRadius:10,padding:"13px 18px",color:"#000",fontFamily:BEBAS,fontSize:18,letterSpacing:1,flexShrink:0,minWidth:70,minHeight:52,transition:"opacity 0.1s"}} onTouchStart={e=>e.currentTarget.style.opacity="0.75"} onTouchEnd={e=>e.currentTarget.style.opacity="1"} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>ADD</button>
-            </div>
-          );
-        })()}
-      </React.Fragment>)}
-      </div>
-
-      {activeView==="week" && (
-        <WeekView T={T} dark={dark} step={step} todayTasks={tasks} onDateSelect={switchDate} activeDate={activeDate}/>
+      ) : (
+        <WeekView step={step} todayTasks={tasks} onDateSelect={switchDate} activeDate={activeDate}/>
       )}
 
-      {editTask&&<EditModal task={editTask} T={T} onSave={p=>{dispatch({type:"UPD_TASK",id:editTask.id,patch:p});setEditTask(null);showToast("Task updated ✓");}} onSchedule={date=>scheduleTask(editTask,date)} onClose={()=>setEditTask(null)}/>}
-      {showSync&&<SyncModal T={T} dark={dark} state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
-      {toast&&<div style={{position:"fixed",bottom:"calc(20px + env(safe-area-inset-bottom,0px))",left:"50%",transform:"translateX(-50%)",zIndex:200,background:toast.type==="err"?"#ff444422":"#FF6B2B22",border:`1px solid ${toast.type==="err"?"#ff4444":"#FF6B2B"}`,borderRadius:24,padding:"12px 22px",fontFamily:MONO,fontSize:12,color:toast.type==="err"?"#ff7777":"#FF6B2B",animation:"toastIn 0.2s ease",whiteSpace:"nowrap",backdropFilter:"blur(8px)"}}>{toast.msg}</div>}
+      {editTask && <EditModal task={editTask}
+        onSave={p=>{dispatch({type:"UPD_TASK", id:editTask.id, patch:p}); setEditTask(null); showToast("Task updated");}}
+        onSchedule={d=>scheduleTask(editTask, d)}
+        onClose={()=>setEditTask(null)}/>}
+      {showSync && <SyncModal state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
+      {showHelp && <HelpModal onClose={()=>setShowHelp(false)}/>}
+      {toast && <div className={`toast ${toast.type==="err"?"err":""}`}><span className="dot"/>{toast.msg}</div>}
     </div>
   );
 }
 
-migrateOldData();
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-<!-- ── Cookie consent banner (vanilla, outside React) ── -->
-<div id="cookie-banner" style="display:none;position:fixed;bottom:20px;right:16px;z-index:9999;max-width:300px;width:calc(100vw - 32px);background:#1a1a1a;border:1px solid #2a2a2a;border-radius:14px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.55);font-family:'Space Mono',monospace;animation:slideIn 0.25s ease;">
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;color:#FF6B2B;margin-bottom:6px;">🍪 COOKIE NOTICE</div>
-  <div style="font-size:10px;color:#888;line-height:1.7;margin-bottom:12px;">
-    Sliders uses <span style="color:#e8e8e8;">localStorage</span> for offline data and a session token for login. No tracking, no ads, no analytics.
-    <a href="./privacy.html" target="_blank" rel="noopener noreferrer" style="color:#4ECDC4;text-decoration:none;border-bottom:1px solid #4ECDC444;"> Privacy Policy ↗</a>
-  </div>
-  <button onclick="acceptCookies()" style="width:100%;background:#FF6B2B;border:none;border-radius:8px;padding:9px;color:#000;font-family:'Space Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:1px;cursor:pointer;">GOT IT</button>
-</div>
-<script>
-  (function() {
-    if (!localStorage.getItem('sliders_cookie_consent')) {
-      document.getElementById('cookie-banner').style.display = 'block';
-    }
-  })();
-  function acceptCookies() {
-    localStorage.setItem('sliders_cookie_consent', '1');
-    var el = document.getElementById('cookie-banner');
-    el.style.opacity = '0';
-    el.style.transition = 'opacity 0.2s ease';
-    setTimeout(function() { el.remove(); }, 220);
-  }
 </script>
 </body>
 </html>
