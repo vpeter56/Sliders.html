@@ -328,7 +328,18 @@ let unsubDays = null;
 let suppressLocalEcho = false;
 const pendingTimers = { meta: null, days: {} };
 
+// Debounce: only write to Firestore after 5s of no further changes (per scope).
+const SYNC_DEBOUNCE_MS = 5000;
+
+// Track the last payload we actually synced per scope, to skip no-op writes
+// (e.g. React re-renders that call saveJSON with an unchanged state object).
+const lastSyncedJson = { meta: null, days: {} };
+
+// Track scopes with pending changes so a single timer flush handles all of them.
+const dirtyScopes = { meta: false, days: new Set() };
+
 function setSyncStatus(s) {
+  if (syncStatus === s) return; // dedup: don't dispatch when nothing changed
   syncStatus = s;
   window.dispatchEvent(new CustomEvent(STATUS_EVENT, { detail: s }));
 }
@@ -339,65 +350,100 @@ const _origSaveDateState = saveDateState;
 saveJSON = function(k, v) {
   _origSaveJSON(k, v);
   if (suppressLocalEcho) return;
-  if (currentUser && SYNC_KEYS.includes(k)) scheduleMetaWrite();
+  if (currentUser && SYNC_KEYS.includes(k)) markMetaDirty();
 };
 saveDateState = function(ds, s) {
   _origSaveDateState(ds, s);
   if (suppressLocalEcho) return;
-  if (currentUser) scheduleDayWrite(ds);
+  if (currentUser) markDayDirty(ds);
 };
 
-function buildMetaPayload() {
-  const payload = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+function buildMetaPayloadRaw() {
+  const out = {};
   for (const k of SYNC_KEYS) {
     const v = loadJSON(k);
-    if (v !== null) payload[k] = v;
+    if (v !== null) out[k] = v;
   }
-  return payload;
+  return out;
 }
-function buildDayPayload(ds) {
+function buildDayPayloadRaw(ds) {
   const v = loadJSON(`sliders_day_${ds}`);
   if (!v) return null;
   if (Array.isArray(v.tasks) && v.tasks.length > 500) {
     console.warn("Day has >500 tasks, skipping cloud sync for", ds);
     return null;
   }
-  return { ...v, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  return v;
 }
 
-function scheduleMetaWrite() {
+function markMetaDirty() {
   if (!currentUser) return;
+  const raw = JSON.stringify(buildMetaPayloadRaw());
+  if (raw === lastSyncedJson.meta) return; // no real change, skip
+  dirtyScopes.meta = true;
   setSyncStatus("pending");
   clearTimeout(pendingTimers.meta);
-  pendingTimers.meta = setTimeout(async () => {
-    if (!currentUser) return;
-    try {
-      await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
-      setSyncStatus("synced");
-    } catch (e) {
-      console.warn("Meta write failed:", e);
-      queuePendingWrite({ type: "meta" });
-      setSyncStatus(navigator.onLine ? "error" : "offline");
-    }
-  }, 1500);
+  pendingTimers.meta = setTimeout(flushMeta, SYNC_DEBOUNCE_MS);
 }
-function scheduleDayWrite(ds) {
+function markDayDirty(ds) {
   if (!currentUser) return;
+  const raw = JSON.stringify(buildDayPayloadRaw(ds));
+  if (raw === lastSyncedJson.days[ds]) return; // no real change, skip
+  dirtyScopes.days.add(ds);
   setSyncStatus("pending");
   clearTimeout(pendingTimers.days[ds]);
-  pendingTimers.days[ds] = setTimeout(async () => {
-    if (!currentUser) return;
-    const payload = buildDayPayload(ds);
-    if (!payload) return;
-    try {
-      await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(ds).set(payload, { merge: true });
-      setSyncStatus("synced");
-    } catch (e) {
-      console.warn("Day write failed for", ds, e);
-      queuePendingWrite({ type: "day", ds });
-      setSyncStatus(navigator.onLine ? "error" : "offline");
-    }
-  }, 1500);
+  pendingTimers.days[ds] = setTimeout(() => flushDay(ds), SYNC_DEBOUNCE_MS);
+}
+
+async function flushMeta() {
+  if (!currentUser || !dirtyScopes.meta) return;
+  const raw = buildMetaPayloadRaw();
+  const rawJson = JSON.stringify(raw);
+  if (rawJson === lastSyncedJson.meta) {
+    dirtyScopes.meta = false;
+    maybeMarkAllSynced();
+    return;
+  }
+  try {
+    await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main")
+      .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    lastSyncedJson.meta = rawJson;
+    dirtyScopes.meta = false;
+    maybeMarkAllSynced();
+  } catch (e) {
+    console.warn("Meta write failed:", e);
+    queuePendingWrite({ type: "meta" });
+    setSyncStatus(navigator.onLine ? "error" : "offline");
+  }
+}
+async function flushDay(ds) {
+  if (!currentUser || !dirtyScopes.days.has(ds)) return;
+  const raw = buildDayPayloadRaw(ds);
+  if (!raw) {
+    dirtyScopes.days.delete(ds);
+    maybeMarkAllSynced();
+    return;
+  }
+  const rawJson = JSON.stringify(raw);
+  if (rawJson === lastSyncedJson.days[ds]) {
+    dirtyScopes.days.delete(ds);
+    maybeMarkAllSynced();
+    return;
+  }
+  try {
+    await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(ds)
+      .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    lastSyncedJson.days[ds] = rawJson;
+    dirtyScopes.days.delete(ds);
+    maybeMarkAllSynced();
+  } catch (e) {
+    console.warn("Day write failed for", ds, e);
+    queuePendingWrite({ type: "day", ds });
+    setSyncStatus(navigator.onLine ? "error" : "offline");
+  }
+}
+function maybeMarkAllSynced() {
+  if (!dirtyScopes.meta && dirtyScopes.days.size === 0) setSyncStatus("synced");
 }
 
 function queuePendingWrite(item) {
@@ -413,10 +459,17 @@ async function flushPendingWrites() {
   for (const item of q) {
     try {
       if (item.type === "meta") {
-        await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
+        const raw = buildMetaPayloadRaw();
+        await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main")
+          .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        lastSyncedJson.meta = JSON.stringify(raw);
       } else if (item.type === "day") {
-        const payload = buildDayPayload(item.ds);
-        if (payload) await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(item.ds).set(payload, { merge: true });
+        const raw = buildDayPayloadRaw(item.ds);
+        if (raw) {
+          await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(item.ds)
+            .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          lastSyncedJson.days[item.ds] = JSON.stringify(raw);
+        }
       }
     } catch (e) { console.warn("Flush failed:", e); return; }
   }
@@ -432,6 +485,8 @@ function applyRemoteMeta(data) {
       if (data[k] !== undefined) _origSaveJSON(k, data[k]);
     }
   } finally { suppressLocalEcho = false; }
+  // Snapshot the now-local state so a follow-up React save with the same data is a no-op.
+  lastSyncedJson.meta = JSON.stringify(buildMetaPayloadRaw());
   window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { scope: "meta" } }));
 }
 function applyRemoteDay(ds, data) {
@@ -442,6 +497,7 @@ function applyRemoteDay(ds, data) {
     _origSaveJSON(`sliders_day_${ds}`, clean);
     if (ds === todayStr()) _origSaveJSON(STORAGE_KEY, clean);
   } finally { suppressLocalEcho = false; }
+  lastSyncedJson.days[ds] = JSON.stringify(buildDayPayloadRaw(ds));
   window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { scope: "day", ds } }));
 }
 
@@ -488,8 +544,12 @@ async function performInitialSync(user) {
     const localDays = getDatesWithTasks();
     for (const ds of Object.keys(localDays)) {
       if (!remoteDayIds.has(ds)) {
-        const payload = buildDayPayload(ds);
-        if (payload) await fbDb.collection("users").doc(uid).collection("days").doc(ds).set(payload, { merge: true });
+        const raw = buildDayPayloadRaw(ds);
+        if (raw) {
+          await fbDb.collection("users").doc(uid).collection("days").doc(ds)
+            .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          lastSyncedJson.days[ds] = JSON.stringify(raw);
+        }
       }
     }
     return { mode: "merged" };
@@ -497,13 +557,20 @@ async function performInitialSync(user) {
   return { mode: "empty" };
 }
 async function uploadAllLocal(uid) {
-  await fbDb.collection("users").doc(uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
+  const metaRaw = buildMetaPayloadRaw();
+  await fbDb.collection("users").doc(uid).collection("meta").doc("main")
+    .set({ ...metaRaw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  lastSyncedJson.meta = JSON.stringify(metaRaw);
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith("sliders_day_")) {
       const ds = key.replace("sliders_day_", "");
-      const payload = buildDayPayload(ds);
-      if (payload) await fbDb.collection("users").doc(uid).collection("days").doc(ds).set(payload, { merge: true });
+      const raw = buildDayPayloadRaw(ds);
+      if (raw) {
+        await fbDb.collection("users").doc(uid).collection("days").doc(ds)
+          .set({ ...raw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        lastSyncedJson.days[ds] = JSON.stringify(raw);
+      }
     }
   }
 }
@@ -1294,100 +1361,6 @@ function EditModal({ task, onSave, onClose, onSchedule }) {
 }
 
 /* ─────────── Sync Modal ─────────── */
-function SyncModal({ state, onImport, onClose }) {
-  const [mode, setMode] = useState("export");
-  const [importStr, setImportStr] = useState("");
-  const [importMode, setImportMode] = useState("full");
-  const [copied, setCopied] = useState(false);
-  const [err, setErr] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const syncStr = encodeSync(state);
-
-  const handleCopy = () => {
-    if (!syncStr) return;
-    navigator.clipboard?.writeText(syncStr).then(()=>setCopied(true));
-    setTimeout(()=>setCopied(false), 2000);
-  };
-  const handleImport = (val) => {
-    setImportStr(val); setErr(null); setPreview(null);
-    if (!val.trim()) return;
-    const d = decodeSync(val);
-    if (!d) { setErr("Invalid code — make sure it's complete."); return; }
-    setPreview(d);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="modal-sheet" style={{padding:"24px 0 24px"}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 24px", marginBottom:18}}>
-          <h2 style={{fontSize:20, fontWeight:600, letterSpacing:"-0.02em"}}>Sync &amp; backup</h2>
-          <button onClick={onClose} className="btn btn-ghost btn-icon" aria-label="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-
-        <div className="tab-bar" style={{borderBottom:"1px solid var(--border)", padding:"0 20px", marginBottom:20}}>
-          <button className={`tab ${mode==="export"?"active":""}`} onClick={()=>setMode("export")}>Export</button>
-          <button className={`tab ${mode==="import"?"active":""}`} onClick={()=>setMode("import")}>Import</button>
-        </div>
-
-        <div style={{padding:"0 24px"}}>
-          {mode==="export" ? (
-            <div>
-              <p style={{fontSize:13, color:"var(--text-3)", lineHeight:1.6, marginBottom:14}}>
-                Copy this code to back up or restore everything (tasks, favourites, settings) on another device.
-              </p>
-              <textarea readOnly value={syncStr||""} className="input"
-                style={{height:96, padding:12, fontFamily:"var(--font-mono)", fontSize:11, lineHeight:1.5, marginBottom:12, resize:"none"}}/>
-              <button onClick={handleCopy} className="btn btn-primary" style={{width:"100%", minHeight:52}}>
-                {copied ? "Copied" : "Copy code"}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p style={{fontSize:13, color:"var(--text-3)", lineHeight:1.6, marginBottom:14}}>
-                Paste your code, then choose how to import.
-              </p>
-              <textarea value={importStr} onChange={e=>handleImport(e.target.value)}
-                placeholder="Paste code here…" className="input"
-                style={{height:96, padding:12, fontFamily:"var(--font-mono)", fontSize:11, lineHeight:1.5, marginBottom:8, resize:"none",
-                        borderColor: err?"var(--danger)":preview?"var(--accent-2)":"var(--border)"}}/>
-              {err && <div style={{fontSize:12, color:"var(--danger)", marginBottom:12}}>{err}</div>}
-              {preview && (
-                <div className="card" style={{padding:"10px 12px", marginBottom:14, fontSize:12, color:"var(--text-3)"}}>
-                  <span style={{color:"var(--accent-2)"}}>✓ Valid </span>·{" "}
-                  {preview.tasks?.length ?? 0} tasks, {preview.favs?.length ?? 0} favourites
-                </div>
-              )}
-              <div className="label" style={{marginBottom:8}}>Mode</div>
-              <div style={{display:"flex", flexDirection:"column", gap:6, marginBottom:18}}>
-                {[["full","Replace all","Overwrites existing data"],
-                  ["merge","Merge new only","Adds only what's missing"]].map(([v,t,d])=>(
-                  <button key={v} onClick={()=>setImportMode(v)}
-                    style={{
-                      background: importMode===v?"var(--bg-elev-2)":"transparent",
-                      border:`1px solid ${importMode===v?"var(--accent)":"var(--border)"}`,
-                      borderRadius:10, padding:"12px 14px", textAlign:"left", cursor:"pointer",
-                      transition:"all 0.15s",
-                    }}>
-                    <div style={{fontSize:14, fontWeight:500, color:importMode===v?"var(--accent)":"var(--text)"}}>{t}</div>
-                    <div style={{fontSize:12, color:"var(--text-3)", marginTop:2}}>{d}</div>
-                  </button>
-                ))}
-              </div>
-              <button onClick={()=>{ if(preview) { onImport(preview, importMode); onClose(); } }}
-                className="btn btn-primary" disabled={!preview}
-                style={{width:"100%", minHeight:52, opacity:preview?1:0.4, cursor:preview?"pointer":"not-allowed"}}>
-                Import
-              </button>
-            </div>
-          )}
-        </div>
-        <div style={{height:"env(safe-area-inset-bottom,0px)"}}/>
-      </div>
-    </div>
-  );
-}
 
 /* ─────────── Timeline strip ─────────── */
 function Timeline({ tasks, dayLen, dayStart }) {
@@ -1775,7 +1748,7 @@ function AccountSection() {
   );
 }
 
-function Settings({ step, showTL, dayStart, dayEnd, dispatch, onExport, onImportFile, onSync, onReset, dark }) {
+function Settings({ step, showTL, dayStart, dayEnd, dispatch, onReset, dark }) {
   const [confirmReset, setConfirmReset] = useState(false);
   return (
     <div className="card" style={{padding:"16px 18px", animation:"fadeUp 0.15s", marginBottom:14}}>
@@ -1812,12 +1785,6 @@ function Settings({ step, showTL, dayStart, dayEnd, dispatch, onExport, onImport
       </div>
 
       <AccountSection />
-
-      <div className="label" style={{marginBottom:8}}>File</div>
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:18}}>
-        <button onClick={onExport} className="btn">Export .md</button>
-        <button onClick={onImportFile} className="btn">Import .md</button>
-      </div>
 
       <div className="label" style={{marginBottom:8}}>Reset</div>
       {!confirmReset ? (
@@ -1897,7 +1864,6 @@ function App() {
   const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFavs, setShowFavs] = useState(false);
-  const [showSync, setShowSync] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [activeView, setActiveView] = useState("today");
   const [activeDate, setActiveDate] = useState(todayStr);
@@ -1910,7 +1876,7 @@ function App() {
   const [nowH, setNowH] = useState(() => { const d=new Date(); return d.getHours() + d.getMinutes()/60 + d.getSeconds()/3600; });
   const activeDateRef = useRef(activeDate);
   const lpTimer = useRef(null), confirmTimer = useRef(null);
-  const taskListRef = useRef(), fileRef = useRef(), inputRef = useRef();
+  const taskListRef = useRef(), inputRef = useRef();
 
   const { tasks, favs, step, dark, showTL, dayStart, dayEnd } = state;
   const dl = calcDayLen(dayStart, dayEnd);
@@ -1951,7 +1917,6 @@ function App() {
       const inForm = tag === "INPUT" || tag === "TEXTAREA" || (e.target && e.target.isContentEditable);
       if (e.key === "Escape") {
         if (editTask) setEditTask(null);
-        else if (showSync) setShowSync(false);
         else if (showHelp) setShowHelp(false);
         else if (showSettings) setShowSettings(false);
         else if (showFavs) setShowFavs(false);
@@ -1978,7 +1943,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editTask, showSync, showHelp, showSettings, showFavs, isTodayDate, state, nowH]);
+  }, [editTask, showHelp, showSettings, showFavs, isTodayDate, state, nowH]);
 
   // Compute which task is "now" (only when viewing today, in-window)
   const isTodayDate = activeDate === todayStr();
@@ -2078,29 +2043,6 @@ function App() {
       window.removeEventListener("pointerup", onUp);
     };
   }, [longDragIdx, dragOver]);
-
-  const exportMD = () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([serializeMD(tasks, dayStart, dayEnd)], {type:"text/markdown"}));
-    a.download = "sliders.md"; a.click();
-    showToast("Exported");
-  };
-  const handleFile = e => {
-    const f = e.target.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = ev => {
-      const { tasks:p, dayStart:ds, dayEnd:de } = parseMD(ev.target.result);
-      if (!p.length) { showToast("No tasks found", "err"); return; }
-      dispatch({type:"SET_TASKS", tasks:p});
-      if (ds!==null && de!==null && de>ds) dispatch({type:"SET_DAY_WINDOW", start:ds, end:de});
-      showToast(`${p.length} tasks loaded`);
-    };
-    r.readAsText(f); e.target.value = "";
-  };
-  const handleSyncImport = (data, mode) => {
-    if (mode==="full") { dispatch({type:"FULL_REPLACE", data}); showToast("Replaced"); }
-    else { dispatch({type:"MERGE_IMPORT", data}); showToast("Merged"); }
-  };
 
   const isToday = isTodayDate;
   const dayLabel = isToday ? "Today" : formatDateLabel(activeDate);
@@ -2204,7 +2146,7 @@ function App() {
           </div>
 
           <div className="col-right">
-          {/* Settings + Sync row */}
+          {/* Settings row */}
           <div style={{display:"flex", gap:8, marginBottom:14}}>
             <button onClick={()=>setShowSettings(v=>!v)} className="btn" style={{flex:1, justifyContent:"space-between", borderColor: showSettings?"var(--accent)":"var(--border)", color: showSettings?"var(--accent)":"var(--text-2)"}}>
               <span style={{display:"flex", alignItems:"center", gap:8}}>
@@ -2213,19 +2155,12 @@ function App() {
               </span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{transform:showSettings?"rotate(180deg)":"none", transition:"transform 0.2s"}}><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <button onClick={()=>setShowSync(true)} className="btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              Sync
-            </button>
           </div>
 
           {showSettings && (
             <Settings
               step={step} showTL={showTL} dayStart={dayStart} dayEnd={dayEnd} dark={dark}
               dispatch={dispatch}
-              onExport={exportMD}
-              onImportFile={()=>fileRef.current.click()}
-              onSync={()=>setShowSync(true)}
               onReset={async ()=>{
                 if (currentUser) {
                   try {
@@ -2241,7 +2176,6 @@ function App() {
                 window.location.reload();
               }}/>
           )}
-          <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
 
           {/* Favourites */}
           {(favs.length>0 || showFavs) && (
@@ -2415,7 +2349,6 @@ function App() {
         onSave={p=>{dispatch({type:"UPD_TASK", id:editTask.id, patch:p}); setEditTask(null); showToast("Task updated");}}
         onSchedule={d=>scheduleTask(editTask, d)}
         onClose={()=>setEditTask(null)}/>}
-      {showSync && <SyncModal state={state} onImport={handleSyncImport} onClose={()=>setShowSync(false)}/>}
       {showHelp && <HelpModal onClose={()=>setShowHelp(false)}/>}
       {toast && <div className={`toast ${toast.type==="err"?"err":""}`}><span className="dot"/>{toast.msg}</div>}
     </div>
