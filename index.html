@@ -14,6 +14,25 @@
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Firebase SDK (compat mode for no-bundler use) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script>
+  // Firebase config — public, safe to be in client code. Security comes from Firestore rules.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAro9NEigphU7nqhyVW-M5B_KQT3-2Ok1A",
+    authDomain: "sliders-6a9d2.firebaseapp.com",
+    projectId: "sliders-6a9d2",
+    storageBucket: "sliders-6a9d2.firebasestorage.app",
+    messagingSenderId: "724353271055",
+    appId: "1:724353271055:web:23adbf5c6ae2771633ea7a",
+    measurementId: "G-E556VKGL0C"
+  };
+  firebase.initializeApp(firebaseConfig);
+  // Enable offline persistence (multi-tab safe). Must run before any Firestore calls.
+  firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{ /* ignore: already enabled or unsupported browser */ });
+</script>
 <style>
 :root {
   --bg: #131420;
@@ -291,6 +310,252 @@ function getTopUsed(n=3) {
   return Object.entries(u).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
 }
 
+/* ─────────── Firebase Sync Layer ─────────── */
+const SYNC_KEYS = ["sliders_data", "sliders_week_v1", "sliders_task_usage", "sliders_tweaks_v1"];
+const PENDING_WRITES_KEY = "sliders_pending_writes";
+const SYNC_EVENT = "sliders-remote-update";
+const STATUS_EVENT = "sliders-sync-status";
+const AUTH_EVENT = "sliders-auth-change";
+
+const fbAuth = firebase.auth();
+const fbDb = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+let currentUser = null;
+let syncStatus = "guest";
+let unsubMeta = null;
+let unsubDays = null;
+let suppressLocalEcho = false;
+const pendingTimers = { meta: null, days: {} };
+
+function setSyncStatus(s) {
+  syncStatus = s;
+  window.dispatchEvent(new CustomEvent(STATUS_EVENT, { detail: s }));
+}
+function getSyncStatus() { return syncStatus; }
+
+const _origSaveJSON = saveJSON;
+const _origSaveDateState = saveDateState;
+saveJSON = function(k, v) {
+  _origSaveJSON(k, v);
+  if (suppressLocalEcho) return;
+  if (currentUser && SYNC_KEYS.includes(k)) scheduleMetaWrite();
+};
+saveDateState = function(ds, s) {
+  _origSaveDateState(ds, s);
+  if (suppressLocalEcho) return;
+  if (currentUser) scheduleDayWrite(ds);
+};
+
+function buildMetaPayload() {
+  const payload = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  for (const k of SYNC_KEYS) {
+    const v = loadJSON(k);
+    if (v !== null) payload[k] = v;
+  }
+  return payload;
+}
+function buildDayPayload(ds) {
+  const v = loadJSON(`sliders_day_${ds}`);
+  if (!v) return null;
+  if (Array.isArray(v.tasks) && v.tasks.length > 500) {
+    console.warn("Day has >500 tasks, skipping cloud sync for", ds);
+    return null;
+  }
+  return { ...v, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+}
+
+function scheduleMetaWrite() {
+  if (!currentUser) return;
+  setSyncStatus("pending");
+  clearTimeout(pendingTimers.meta);
+  pendingTimers.meta = setTimeout(async () => {
+    if (!currentUser) return;
+    try {
+      await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
+      setSyncStatus("synced");
+    } catch (e) {
+      console.warn("Meta write failed:", e);
+      queuePendingWrite({ type: "meta" });
+      setSyncStatus(navigator.onLine ? "error" : "offline");
+    }
+  }, 1500);
+}
+function scheduleDayWrite(ds) {
+  if (!currentUser) return;
+  setSyncStatus("pending");
+  clearTimeout(pendingTimers.days[ds]);
+  pendingTimers.days[ds] = setTimeout(async () => {
+    if (!currentUser) return;
+    const payload = buildDayPayload(ds);
+    if (!payload) return;
+    try {
+      await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(ds).set(payload, { merge: true });
+      setSyncStatus("synced");
+    } catch (e) {
+      console.warn("Day write failed for", ds, e);
+      queuePendingWrite({ type: "day", ds });
+      setSyncStatus(navigator.onLine ? "error" : "offline");
+    }
+  }, 1500);
+}
+
+function queuePendingWrite(item) {
+  const q = loadJSON(PENDING_WRITES_KEY, []);
+  const key = item.type === "day" ? `day:${item.ds}` : "meta";
+  const exists = q.some(x => (x.type === "day" ? `day:${x.ds}` : "meta") === key);
+  if (!exists) { q.push(item); _origSaveJSON(PENDING_WRITES_KEY, q); }
+}
+async function flushPendingWrites() {
+  if (!currentUser) return;
+  const q = loadJSON(PENDING_WRITES_KEY, []);
+  if (!q.length) return;
+  for (const item of q) {
+    try {
+      if (item.type === "meta") {
+        await fbDb.collection("users").doc(currentUser.uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
+      } else if (item.type === "day") {
+        const payload = buildDayPayload(item.ds);
+        if (payload) await fbDb.collection("users").doc(currentUser.uid).collection("days").doc(item.ds).set(payload, { merge: true });
+      }
+    } catch (e) { console.warn("Flush failed:", e); return; }
+  }
+  _origSaveJSON(PENDING_WRITES_KEY, []);
+  setSyncStatus("synced");
+}
+
+function applyRemoteMeta(data) {
+  if (!data) return;
+  suppressLocalEcho = true;
+  try {
+    for (const k of SYNC_KEYS) {
+      if (data[k] !== undefined) _origSaveJSON(k, data[k]);
+    }
+  } finally { suppressLocalEcho = false; }
+  window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { scope: "meta" } }));
+}
+function applyRemoteDay(ds, data) {
+  if (!data) return;
+  suppressLocalEcho = true;
+  try {
+    const { updatedAt, ...clean } = data;
+    _origSaveJSON(`sliders_day_${ds}`, clean);
+    if (ds === todayStr()) _origSaveJSON(STORAGE_KEY, clean);
+  } finally { suppressLocalEcho = false; }
+  window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: { scope: "day", ds } }));
+}
+
+function startListeners(uid) {
+  stopListeners();
+  unsubMeta = fbDb.collection("users").doc(uid).collection("meta").doc("main")
+    .onSnapshot(snap => {
+      if (!snap.exists) return;
+      if (snap.metadata.hasPendingWrites) return;
+      applyRemoteMeta(snap.data());
+    }, err => console.warn("Meta listener error:", err));
+  unsubDays = fbDb.collection("users").doc(uid).collection("days")
+    .onSnapshot(snap => {
+      snap.docChanges().forEach(ch => {
+        if (ch.doc.metadata.hasPendingWrites) return;
+        if (ch.type === "added" || ch.type === "modified") applyRemoteDay(ch.doc.id, ch.doc.data());
+      });
+    }, err => console.warn("Days listener error:", err));
+}
+function stopListeners() {
+  if (unsubMeta) { unsubMeta(); unsubMeta = null; }
+  if (unsubDays) { unsubDays(); unsubDays = null; }
+}
+
+async function performInitialSync(user) {
+  const uid = user.uid;
+  const metaDoc = await fbDb.collection("users").doc(uid).collection("meta").doc("main").get();
+  const daysSnap = await fbDb.collection("users").doc(uid).collection("days").get();
+  const remoteHasData = metaDoc.exists || !daysSnap.empty;
+  const localHasData = SYNC_KEYS.some(k => loadJSON(k) !== null) || Object.keys(getDatesWithTasks()).length > 0;
+  if (remoteHasData && !localHasData) {
+    if (metaDoc.exists) applyRemoteMeta(metaDoc.data());
+    daysSnap.forEach(d => applyRemoteDay(d.id, d.data()));
+    return { mode: "downloaded" };
+  }
+  if (!remoteHasData && localHasData) {
+    await uploadAllLocal(uid);
+    return { mode: "uploaded" };
+  }
+  if (remoteHasData && localHasData) {
+    if (metaDoc.exists) applyRemoteMeta(metaDoc.data());
+    const remoteDayIds = new Set();
+    daysSnap.forEach(d => { remoteDayIds.add(d.id); applyRemoteDay(d.id, d.data()); });
+    const localDays = getDatesWithTasks();
+    for (const ds of Object.keys(localDays)) {
+      if (!remoteDayIds.has(ds)) {
+        const payload = buildDayPayload(ds);
+        if (payload) await fbDb.collection("users").doc(uid).collection("days").doc(ds).set(payload, { merge: true });
+      }
+    }
+    return { mode: "merged" };
+  }
+  return { mode: "empty" };
+}
+async function uploadAllLocal(uid) {
+  await fbDb.collection("users").doc(uid).collection("meta").doc("main").set(buildMetaPayload(), { merge: true });
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith("sliders_day_")) {
+      const ds = key.replace("sliders_day_", "");
+      const payload = buildDayPayload(ds);
+      if (payload) await fbDb.collection("users").doc(uid).collection("days").doc(ds).set(payload, { merge: true });
+    }
+  }
+}
+
+function wipeLocalSlidersData() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("sliders_")) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+}
+
+async function signInWithGoogle() {
+  try { await fbAuth.signInWithPopup(googleProvider); }
+  catch (e) {
+    console.warn("Sign-in failed:", e);
+    window.dispatchEvent(new CustomEvent("sliders-toast", { detail: { msg: "Sign-in failed: " + (e.message || e.code), type: "error" } }));
+  }
+}
+async function signOutUser() {
+  try {
+    stopListeners();
+    await fbAuth.signOut();
+    wipeLocalSlidersData();
+    window.location.reload();
+  } catch (e) { console.warn("Sign-out failed:", e); }
+}
+
+fbAuth.onAuthStateChanged(async (user) => {
+  currentUser = user;
+  if (user) {
+    setSyncStatus("pending");
+    try {
+      await performInitialSync(user);
+      startListeners(user.uid);
+      await flushPendingWrites();
+      setSyncStatus("synced");
+    } catch (e) {
+      console.warn("Initial sync failed:", e);
+      setSyncStatus("error");
+    }
+  } else {
+    stopListeners();
+    setSyncStatus("guest");
+  }
+  window.dispatchEvent(new CustomEvent(AUTH_EVENT, { detail: user ? { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null }));
+});
+
+window.addEventListener("online", () => { if (currentUser) flushPendingWrites(); });
+window.addEventListener("offline", () => { if (currentUser) setSyncStatus("offline"); });
+
 const PALETTE = [
   "#ff7a5c", "#5dd6c5", "#ffd166", "#a78bfa", "#06b6d4",
   "#f472b6", "#84cc16", "#fb923c", "#60a5fa", "#c084fc",
@@ -385,6 +650,7 @@ function blankDayState(base) {
 function reducer(state, action) {
   const dl = calcDayLen(state.dayStart, state.dayEnd);
   switch (action.type) {
+    case "HYDRATE": return { ...state, ...action.state };
     case "ADD_TASK": {
       const { name, color, hours } = action;
       const fav = state.favs.find(f => nameLc(f.name)===nameLc(name));
@@ -1386,6 +1652,129 @@ function WeekView({ step, todayTasks, onDateSelect, activeDate }) {
 }
 
 /* ─────────── Settings Panel ─────────── */
+/* ─────────── Auth + Sync hooks ─────────── */
+function useAuth() {
+  const [user, setUser] = useState(() => {
+    const u = fbAuth.currentUser;
+    return u ? { uid: u.uid, email: u.email, displayName: u.displayName, photoURL: u.photoURL } : null;
+  });
+  useEffect(() => {
+    const h = (e) => setUser(e.detail);
+    window.addEventListener(AUTH_EVENT, h);
+    return () => window.removeEventListener(AUTH_EVENT, h);
+  }, []);
+  return user;
+}
+function useSyncStatus() {
+  const [status, setStatus] = useState(getSyncStatus());
+  useEffect(() => {
+    const h = (e) => setStatus(e.detail);
+    window.addEventListener(STATUS_EVENT, h);
+    return () => window.removeEventListener(STATUS_EVENT, h);
+  }, []);
+  return status;
+}
+// Forces a re-render when remote data is pulled into localStorage.
+function useRemoteUpdates(cb) {
+  useEffect(() => {
+    const h = (e) => cb && cb(e.detail);
+    window.addEventListener(SYNC_EVENT, h);
+    return () => window.removeEventListener(SYNC_EVENT, h);
+  }, [cb]);
+}
+
+function HeaderSyncDot() {
+  const user = useAuth();
+  const status = useSyncStatus();
+  if (!user) return null;
+  const colors = { synced: "var(--success)", pending: "var(--accent-3)", offline: "var(--text-3)", error: "var(--danger)" };
+  const c = colors[status] || "var(--text-3)";
+  const titles = { synced: "All changes synced", pending: "Syncing…", offline: "Offline — will sync when back online", error: "Sync error" };
+  return (
+    <span title={titles[status] || ""} style={{
+      display:"inline-block", width:6, height:6, borderRadius:"50%", background:c,
+      marginLeft:2, animation: status==="pending"?"pulse 1.2s infinite":"none",
+    }}/>
+  );
+}
+
+function SyncBadge() {
+  const status = useSyncStatus();
+  const user = useAuth();
+  if (!user) return null;
+  const colors = { synced: "var(--success)", pending: "var(--accent-3)", offline: "var(--text-3)", error: "var(--danger)" };
+  const labels = { synced: "Synced", pending: "Syncing…", offline: "Offline", error: "Sync error" };
+  const c = colors[status] || "var(--text-3)";
+  return (
+    <div title={labels[status] || status} style={{
+      display:"inline-flex", alignItems:"center", gap:6,
+      fontSize:11, color:"var(--text-3)", padding:"3px 8px",
+      background:"var(--bg-elev)", borderRadius:99, border:"1px solid var(--border)",
+    }}>
+      <span style={{
+        width:7, height:7, borderRadius:"50%", background:c,
+        animation: status==="pending"?"pulse 1.2s infinite":"none",
+      }}/>
+      {labels[status] || "—"}
+    </div>
+  );
+}
+
+function AccountSection() {
+  const user = useAuth();
+  const status = useSyncStatus();
+  const [busy, setBusy] = useState(false);
+  const onSignIn = async () => { setBusy(true); await signInWithGoogle(); setBusy(false); };
+  const onSignOut = async () => {
+    if (!confirm("Sign out? Your data stays safe in the cloud and will return when you sign back in. Local copy on this device will be cleared.")) return;
+    setBusy(true); await signOutUser();
+  };
+  return (
+    <div style={{marginBottom:18}}>
+      <div className="label" style={{marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <span>Account & sync</span>
+        <SyncBadge />
+      </div>
+      {!user ? (
+        <div className="card" style={{padding:14, background:"var(--bg-input)", border:"1px solid var(--border)"}}>
+          <div style={{fontSize:13, color:"var(--text-2)", marginBottom:10, lineHeight:1.5}}>
+            Sign in to sync your tasks, week plan and settings across all your devices. Your data stays private — only you can read it.
+          </div>
+          <button onClick={onSignIn} disabled={busy} className="btn" style={{
+            width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            background:"#fff", color:"#1a1a1a", border:"1px solid var(--border)", fontWeight:500,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
+              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.3-7.2 2.3-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.5 16.2 44 24 44z"/>
+              <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C41.4 35.4 44 30.1 44 24c0-1.3-.1-2.4-.4-3.5z"/>
+            </svg>
+            {busy ? "Opening…" : "Sign in with Google"}
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{padding:14, background:"var(--bg-input)", border:"1px solid var(--border)"}}>
+          <div style={{display:"flex", alignItems:"center", gap:10, marginBottom:12}}>
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="" referrerPolicy="no-referrer" style={{width:36, height:36, borderRadius:"50%", objectFit:"cover"}}/>
+            ) : (
+              <div style={{width:36, height:36, borderRadius:"50%", background:"var(--accent)", color:"#0a0b12", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:600, fontSize:14}}>
+                {(user.displayName || user.email || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div style={{minWidth:0, flex:1}}>
+              <div style={{fontSize:13, fontWeight:500, color:"var(--text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{user.displayName || user.email}</div>
+              <div style={{fontSize:11, color:"var(--text-3)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{user.email}</div>
+            </div>
+          </div>
+          <button onClick={onSignOut} disabled={busy} className="btn" style={{width:"100%"}}>{busy ? "Signing out…" : "Sign out"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Settings({ step, showTL, dayStart, dayEnd, dispatch, onExport, onImportFile, onSync, onReset, dark }) {
   const [confirmReset, setConfirmReset] = useState(false);
   return (
@@ -1421,6 +1810,8 @@ function Settings({ step, showTL, dayStart, dayEnd, dispatch, onExport, onImport
           }}>{s.l}</button>
         ))}
       </div>
+
+      <AccountSection />
 
       <div className="label" style={{marginBottom:8}}>File</div>
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:18}}>
@@ -1532,6 +1923,15 @@ function App() {
     saveDateState(activeDateRef.current, state);
     saveJSON(STORAGE_KEY, state);
   }, [state]);
+
+  // When remote sync pushes new data into localStorage, rehydrate the reducer state
+  // for the currently active date. Without this, the in-memory state would be stale.
+  useRemoteUpdates((detail) => {
+    if (!detail) return;
+    if (detail.scope === "day" && detail.ds !== activeDateRef.current) return;
+    const fresh = loadDateState(activeDateRef.current) || loadJSON(STORAGE_KEY);
+    if (fresh) dispatch({ type: "HYDRATE", state: fresh });
+  });
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark?"dark":"light");
     document.getElementById("themeColorMeta").content = dark?"#131420":"#fdf6ee";
@@ -1719,6 +2119,7 @@ function App() {
                 <span className="tnum">{formatTime(nowH)}</span>
                 <span style={{opacity:0.4}}>·</span>
                 <span>{step}m</span>
+                <HeaderSyncDot />
               </div>
             </div>
           </div>
@@ -1825,7 +2226,20 @@ function App() {
               onExport={exportMD}
               onImportFile={()=>fileRef.current.click()}
               onSync={()=>setShowSync(true)}
-              onReset={()=>{ localStorage.removeItem(STORAGE_KEY); window.location.reload(); }}/>
+              onReset={async ()=>{
+                if (currentUser) {
+                  try {
+                    const uid = currentUser.uid;
+                    await fbDb.collection("users").doc(uid).collection("meta").doc("main").delete().catch(()=>{});
+                    const daysSnap = await fbDb.collection("users").doc(uid).collection("days").get();
+                    const batch = fbDb.batch();
+                    daysSnap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                  } catch (e) { console.warn("Cloud reset failed:", e); }
+                }
+                wipeLocalSlidersData();
+                window.location.reload();
+              }}/>
           )}
           <input ref={fileRef} type="file" accept=".md" style={{display:"none"}} onChange={handleFile}/>
 
